@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>P4 — مراجعة صور القديسين</title>
+  <!-- P4 review (docs/daily-bread/saints/P4-PROGRESS.md): every prepared picture next to its person, BEFORE any import.
+       Run: node docs/daily-bread/saints/p4/tools/serve.mjs 4344 → http://localhost:4344/docs/daily-bread/saints/p4/
+       The site's own CSS (main + bread) so the feast card preview is the real card. -->
+  <link rel="stylesheet" href="../../../../assets/css/main.css">
+  <link rel="stylesheet" href="../../../../assets/css/bread.css">
+  <link rel="stylesheet" href="p4.css">
+</head>
+<body class="br-page p4">
+  <main class="p4-main" id="app"><p class="p4-loading">بيحمّل…</p></main>
+  <dialog class="p4-dlg" id="dlg"></dialog>
+  <script type="module" src="p4.js"></script>
+</body>
+</html>

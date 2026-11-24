@@ -46,6 +46,15 @@
         "4342"
       ],
       "port": 4342
+    },
+    {
+      "name": "p4-review",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "docs/daily-bread/saints/p4/tools/serve.mjs",
+        "4344"
+      ],
+      "port": 4344
     }
   ]
 }

@@ -43,3 +43,6 @@ apps-script/*.local.gs
 # «خبزنا اليومي» St-Takla fetch (tools/bread-takla.mjs)
 .takla-cache/
 /suggest/
+
+# P4 review: screenshots with the owner pictures stay on this machine until the owner approves (like P3)
+docs/daily-bread/saints/p4/shots-local/

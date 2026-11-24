@@ -1,0 +1,6386 @@
+{
+ "made": "2026-11-24T15:17:34.117Z",
+ "out": "D:/private_projects/khobzna-work/p4-pictures",
+ "categories": {
+  "angels": "السيدة العذراء والملائكة",
+  "prophets": "أنبياء وأبرار العهد القديم",
+  "apostles": "الرسل",
+  "martyrs": "الشهداء",
+  "modern": "شهداء العصر الحديث",
+  "ascetics": "النساك والرهبان",
+  "popes": "البابوات",
+  "bishops": "الأساقفة والمطارنة",
+  "fathers": "الآباء الكهنة والرهبان",
+  "laity": "قديسين من الشعب",
+  "teachers": "آباء ومعلمو الكنيسة",
+  "ourchurch": "آباء كنيستنا"
+ },
+ "persons": [
+  {
+   "id": "mary",
+   "name": "السيدة العذراء مريم",
+   "cat": "angels",
+   "class": "reposed",
+   "feasts": [
+    "ميلادها",
+    "دخولها الهيكل",
+    "تذكار حبل حنة بها",
+    "نياحتها",
+    "تجليها بالزيتون",
+    "مجيء العائلة المقدسة لمصر",
+    "بشارة يواقيم بميلادها",
+    "صعود جسدها"
+   ]
+  },
+  {
+   "id": "michael",
+   "name": "رئيس الملائكة ميخائيل",
+   "cat": "angels",
+   "class": "reposed",
+   "feasts": [
+    "عيده",
+    "عيده"
+   ]
+  },
+  {
+   "id": "gabriel",
+   "name": "رئيس الملائكة غبريال",
+   "cat": "angels",
+   "class": "reposed",
+   "feasts": [
+    "تذكاره",
+    "تذكاره",
+    "تذكاره",
+    "تكريس كنيسته"
+   ]
+  },
+  {
+   "id": "raphael",
+   "name": "رئيس الملائكة روفائيل",
+   "cat": "angels",
+   "class": "reposed",
+   "feasts": [
+    "تذكاره"
+   ]
+  },
+  {
+   "id": "suriel",
+   "name": "رئيس الملائكة سوريال",
+   "cat": "angels",
+   "class": "reposed",
+   "feasts": [
+    "تذكاره"
+   ]
+  },
+  {
+   "id": "moses",
+   "name": "موسى النبي",
+   "cat": "prophets",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "elijah",
+   "name": "إيليا النبي",
+   "cat": "prophets",
+   "class": "reposed",
+   "feasts": [
+    "صعوده إلى السماء"
+   ]
+  },
+  {
+   "id": "daniel",
+   "name": "دانيال النبي",
+   "cat": "prophets",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "jeremiah",
+   "name": "إرميا النبي",
+   "cat": "prophets",
+   "class": "reposed",
+   "feasts": [
+    "استشهاده"
+   ]
+  },
+  {
+   "id": "threeyouths",
+   "name": "الفتية الثلاثة القديسين حنانيا وعزريا وميصائيل",
+   "cat": "prophets",
+   "class": "reposed",
+   "feasts": [
+    "نياحتهم"
+   ]
+  },
+  {
+   "id": "baptist",
+   "name": "القديس يوحنا المعمدان",
+   "cat": "prophets",
+   "class": "reposed",
+   "feasts": [
+    "استشهاده",
+    "ميلاده"
+   ]
+  },
+  {
+   "id": "mark",
+   "name": "مار مرقس الرسول",
+   "cat": "apostles",
+   "class": "reposed",
+   "feasts": [
+    "ظهور رأسه",
+    "استشهاده",
+    "عودة رفاته"
+   ]
+  },
+  {
+   "id": "peterpaul",
+   "name": "الرسولان بطرس وبولس",
+   "cat": "apostles",
+   "class": "reposed",
+   "feasts": [
+    "استشهادهما"
+   ]
+  },
+  {
+   "id": "stephen",
+   "name": "القديس استفانوس أول الشهداء",
+   "cat": "apostles",
+   "class": "reposed",
+   "feasts": [
+    "استشهاده"
+   ]
+  },
+  {
+   "id": "mercurius",
+   "name": "الشهيد العظيم أبي سيفين (فيلوباتير مرقوريوس)",
+   "cat": "martyrs",
+   "class": "reposed",
+   "feasts": [
+    "استشهاده",
+    "نقل أعضائه",
+    "تكريس كنيسته"
+   ]
+  },
+  {
+   "id": "george",
+   "name": "الشهيد العظيم مار جرجس",
+   "cat": "martyrs",
+   "class": "reposed",
+   "feasts": [
+    "تكريس كنيسته",
+    "استشهاده",
+    "إحضار جسده"
+   ]
+  },
+  {
+   "id": "mina",
+   "name": "الشهيد مار مينا العجايبي",
+   "cat": "martyrs",
+   "class": "reposed",
+   "feasts": [
+    "استشهاده",
+    "تكريس كنيسته بمريوط"
+   ]
+  },
+  {
+   "id": "theodore",
+   "name": "الأمير تادرس الشطبي",
+   "cat": "martyrs",
+   "class": "reposed",
+   "feasts": [
+    "استشهاده"
+   ]
+  },
+  {
+   "id": "theodoreeast",
+   "name": "الشهيد تادرس المشرقي",
+   "cat": "martyrs",
+   "class": "reposed",
+   "feasts": [
+    "استشهاده"
+   ]
+  },
+  {
+   "id": "abaskhiron",
+   "name": "الشهيد أباسخيرون القليني",
+   "cat": "martyrs",
+   "class": "reposed",
+   "feasts": [
+    "استشهاده"
+   ]
+  },
+  {
+   "id": "abufam",
+   "name": "الشهيد أبو فام الجندي",
+   "cat": "martyrs",
+   "class": "reposed",
+   "feasts": [
+    "تكريس كنيسته",
+    "استشهاده"
+   ]
+  },
+  {
+   "id": "victor",
+   "name": "الشهيد مار بقطر بن رومانيوس",
+   "cat": "martyrs",
+   "class": "reposed",
+   "feasts": [
+    "استشهاده"
+   ]
+  },
+  {
+   "id": "abakir",
+   "name": "الشهيدان أباكير ويوحنا",
+   "cat": "martyrs",
+   "class": "reposed",
+   "feasts": [
+    "استشهادهما"
+   ]
+  },
+  {
+   "id": "abanoub",
+   "name": "الشهيد أبانوب النهيسي",
+   "cat": "martyrs",
+   "class": "reposed",
+   "feasts": [
+    "استشهاده"
+   ]
+  },
+  {
+   "id": "sergius",
+   "name": "الشهيدان سرجيوس وواخس",
+   "cat": "martyrs",
+   "class": "reposed",
+   "feasts": [
+    "استشهاد سرجيوس"
+   ]
+  },
+  {
+   "id": "james",
+   "name": "الشهيد يعقوب المقطع",
+   "cat": "martyrs",
+   "class": "reposed",
+   "feasts": [
+    "تذكاره"
+   ]
+  },
+  {
+   "id": "bidaba",
+   "name": "الشهيد الأنبا بضابا ورفيقاه",
+   "cat": "martyrs",
+   "class": "reposed",
+   "feasts": [
+    "استشهادهم"
+   ]
+  },
+  {
+   "id": "sevenanthony",
+   "name": "السبعة شهداء بجبل أنطونيوس",
+   "cat": "martyrs",
+   "class": "reposed",
+   "feasts": [
+    "تذكارهم"
+   ]
+  },
+  {
+   "id": "sidhom",
+   "name": "الشهيد سيدهم بشاي",
+   "cat": "martyrs",
+   "class": "reposed",
+   "feasts": [
+    "استشهاده"
+   ]
+  },
+  {
+   "id": "demiana",
+   "name": "الشهيدة دميانة",
+   "cat": "martyrs",
+   "class": "reposed",
+   "feasts": [
+    "استشهادها",
+    "تكريس كنيستها"
+   ]
+  },
+  {
+   "id": "marina",
+   "name": "الشهيدة مارينا",
+   "cat": "martyrs",
+   "class": "reposed",
+   "feasts": [
+    "تكريس كنيستها",
+    "استشهادها"
+   ]
+  },
+  {
+   "id": "barbara",
+   "name": "الشهيدة بربارة",
+   "cat": "martyrs",
+   "class": "reposed",
+   "feasts": [
+    "استشهادها"
+   ]
+  },
+  {
+   "id": "rebecca",
+   "name": "الشهيدة رفقة وأولادها الخمسة",
+   "cat": "martyrs",
+   "class": "reposed",
+   "feasts": [
+    "استشهادهم"
+   ]
+  },
+  {
+   "id": "cosmasdamian",
+   "name": "القديسان قزمان ودميان وإخوتهما وأمهم",
+   "cat": "martyrs",
+   "class": "reposed",
+   "feasts": [
+    "استشهادهم",
+    "تكريس كنيستهم"
+   ]
+  },
+  {
+   "id": "julius",
+   "name": "الشهيد يوليوس الأقفهصي",
+   "cat": "martyrs",
+   "class": "reposed",
+   "feasts": [
+    "استشهاده"
+   ]
+  },
+  {
+   "id": "modernmartyrs",
+   "name": "شهداء ليبيا وشهداء العصر الحديث",
+   "cat": "modern",
+   "class": "reposed",
+   "feasts": [
+    "عيد شهداء العصر الحديث"
+   ]
+  },
+  {
+   "id": "minaaboud",
+   "name": "الشهيد القس مينا عبود شاروبيم",
+   "cat": "modern",
+   "class": "reposed",
+   "feasts": [
+    "استشهاده"
+   ]
+  },
+  {
+   "id": "anthony",
+   "name": "القديس الأنبا أنطونيوس",
+   "cat": "ascetics",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "paul",
+   "name": "القديس الأنبا بولا أول السواح",
+   "cat": "ascetics",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "macarius",
+   "name": "القديس الأنبا مقار الكبير",
+   "cat": "ascetics",
+   "class": "reposed",
+   "feasts": [
+    "نياحته",
+    "عودة جسده"
+   ]
+  },
+  {
+   "id": "macariusalex",
+   "name": "القديس مقاريوس السكندري",
+   "cat": "ascetics",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "bishoy",
+   "name": "القديس الأنبا بيشوي",
+   "cat": "ascetics",
+   "class": "reposed",
+   "feasts": [
+    "نقل جسده",
+    "نياحته"
+   ]
+  },
+  {
+   "id": "mosesblack",
+   "name": "القديس الأنبا موسى الأسود",
+   "cat": "ascetics",
+   "class": "reposed",
+   "feasts": [
+    "استشهاده"
+   ]
+  },
+  {
+   "id": "johnshort",
+   "name": "القديس الأنبا يحنس القصير",
+   "cat": "ascetics",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "maximus",
+   "name": "القديسان مكسيموس ودوماديوس",
+   "cat": "ascetics",
+   "class": "reposed",
+   "feasts": [
+    "نياحة مكسيموس",
+    "نياحة دوماديوس"
+   ]
+  },
+  {
+   "id": "pachom",
+   "name": "القديس الأنبا باخوميوس أب الشركة",
+   "cat": "ascetics",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "shenoute",
+   "name": "القديس الأنبا شنودة رئيس المتوحدين",
+   "cat": "ascetics",
+   "class": "reposed",
+   "feasts": [
+    "تكريس كنيسته",
+    "نياحته"
+   ]
+  },
+  {
+   "id": "karas",
+   "name": "القديس الأنبا كاراس السائح",
+   "cat": "ascetics",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "samuel",
+   "name": "القديس الأنبا صموئيل المعترف",
+   "cat": "ascetics",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "takla",
+   "name": "القديس الأنبا تكلا هيمانوت",
+   "cat": "ascetics",
+   "class": "reposed",
+   "feasts": [
+    "ميلاده",
+    "نياحته"
+   ]
+  },
+  {
+   "id": "barsoum",
+   "name": "القديس الأنبا برسوم العريان",
+   "cat": "ascetics",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "reweis",
+   "name": "القديس الأنبا رويس",
+   "cat": "ascetics",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "hedraaswan",
+   "name": "القديس الأنبا هدرا الأسواني",
+   "cat": "ascetics",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "sarapamonabutarha",
+   "name": "القديس الأنبا صرابامون أبو طرحة",
+   "cat": "ascetics",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "yohanneskama",
+   "name": "القديس الأنبا يحنس كاما",
+   "cat": "ascetics",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "marycopt",
+   "name": "القديسة مريم المصرية",
+   "cat": "ascetics",
+   "class": "reposed",
+   "feasts": [
+    "نياحتها"
+   ]
+  },
+  {
+   "id": "verena",
+   "name": "القديسة فيرينا",
+   "cat": "ascetics",
+   "class": "reposed",
+   "feasts": [
+    "نياحتها"
+   ]
+  },
+  {
+   "id": "athanasius",
+   "name": "القديس البابا أثناسيوس الرسولي",
+   "cat": "popes",
+   "class": "reposed",
+   "feasts": [
+    "تذكار معجزته",
+    "نياحته"
+   ]
+  },
+  {
+   "id": "peterseal",
+   "name": "القديس البابا بطرس خاتم الشهداء",
+   "cat": "popes",
+   "class": "reposed",
+   "feasts": [
+    "استشهاده"
+   ]
+  },
+  {
+   "id": "cyril",
+   "name": "القديس البابا كيرلس عمود الدين",
+   "cat": "popes",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "dioscorus",
+   "name": "القديس البابا ديسقورس",
+   "cat": "popes",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "matthew1",
+   "name": "القديس البابا متاؤس الأول",
+   "cat": "popes",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "cyril4",
+   "name": "البابا كيرلس الرابع أبو الإصلاح",
+   "cat": "popes",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "cyril5",
+   "name": "القديس البابا كيرلس الخامس",
+   "cat": "popes",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "cyril6",
+   "name": "القديس البابا كيرلس السادس",
+   "cat": "popes",
+   "class": "reposed",
+   "feasts": [
+    "عيد جلوسه",
+    "نياحته"
+   ]
+  },
+  {
+   "id": "shenouda3",
+   "name": "البابا شنودة الثالث",
+   "cat": "popes",
+   "class": "reposed",
+   "feasts": [
+    "عيد جلوسه",
+    "نياحته"
+   ]
+  },
+  {
+   "id": "tawadros2",
+   "name": "البابا تواضروس الثاني",
+   "cat": "popes",
+   "class": "living",
+   "feasts": [
+    "عيد جلوسه"
+   ]
+  },
+  {
+   "id": "abraam",
+   "name": "القديس الأنبا إبرآم أسقف الفيوم والجيزة",
+   "cat": "bishops",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "yousababah",
+   "name": "القديس الأنبا يوساب الأبح أسقف جرجا",
+   "cat": "bishops",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "sarapamonkhartoum",
+   "name": "القديس الأنبا صرابامون مطران الخرطوم",
+   "cat": "bishops",
+   "class": "reposed",
+   "feasts": [
+    "تذكار رسامته",
+    "نياحته"
+   ]
+  },
+  {
+   "id": "kirolloskena",
+   "name": "الأنبا كيرلس مطران قنا ومحافظات البحر الأحمر",
+   "cat": "bishops",
+   "class": "reposed",
+   "feasts": [
+    "تذكار رسامته",
+    "نياحته"
+   ]
+  },
+  {
+   "id": "makariosqena",
+   "name": "القديس الأنبا مكاريوس أسقف قنا",
+   "cat": "bishops",
+   "class": "reposed",
+   "feasts": [
+    "تذكار رسامته",
+    "نياحته"
+   ]
+  },
+  {
+   "id": "theophilus",
+   "name": "الأنبا ثاؤفيلس أول أسقف للبحر الأحمر",
+   "cat": "bishops",
+   "class": "reposed",
+   "feasts": [
+    "تذكار رسامته",
+    "نياحته"
+   ]
+  },
+  {
+   "id": "ilarion",
+   "name": "الأنبا إيلاريون أسقف البحر الأحمر",
+   "cat": "bishops",
+   "class": "living",
+   "feasts": [
+    "عيد رسامته",
+    "عيد تجليسه"
+   ]
+  },
+  {
+   "id": "hedra",
+   "name": "الأنبا هدرا مطران أسوان",
+   "cat": "bishops",
+   "class": "reposed",
+   "feasts": [
+    "تذكار رسامته",
+    "نياحته"
+   ]
+  },
+  {
+   "id": "pachomius",
+   "name": "الأنبا باخوميوس مطران البحيرة",
+   "cat": "bishops",
+   "class": "reposed",
+   "feasts": [
+    "تذكار رسامته",
+    "نياحته"
+   ]
+  },
+  {
+   "id": "bishoydam",
+   "name": "الأنبا بيشوي مطران دمياط",
+   "cat": "bishops",
+   "class": "reposed",
+   "feasts": [
+    "تذكار رسامته",
+    "نياحته"
+   ]
+  },
+  {
+   "id": "samuelserv",
+   "name": "الأنبا صموئيل أسقف الخدمات",
+   "cat": "bishops",
+   "class": "reposed",
+   "feasts": [
+    "تذكار رسامته",
+    "نياحته"
+   ]
+  },
+  {
+   "id": "gregorios",
+   "name": "الأنبا غريغوريوس أسقف البحث العلمي",
+   "cat": "bishops",
+   "class": "reposed",
+   "feasts": [
+    "تذكار رسامته",
+    "نياحته"
+   ]
+  },
+  {
+   "id": "bimen",
+   "name": "الأنبا بيمن أسقف ملوي",
+   "cat": "bishops",
+   "class": "reposed",
+   "feasts": [
+    "تذكار رسامته",
+    "نياحته"
+   ]
+  },
+  {
+   "id": "mikhailassiut",
+   "name": "الأنبا ميخائيل مطران أسيوط",
+   "cat": "bishops",
+   "class": "reposed",
+   "feasts": [
+    "تذكار رسامته",
+    "نياحته"
+   ]
+  },
+  {
+   "id": "epiphanius",
+   "name": "الأنبا إبيفانيوس أسقف دير أبو مقار",
+   "cat": "bishops",
+   "class": "reposed",
+   "feasts": [
+    "تذكار رسامته",
+    "نياحته"
+   ]
+  },
+  {
+   "id": "athanasiusbs",
+   "name": "الأنبا أثناسيوس مطران بني سويف",
+   "cat": "bishops",
+   "class": "reposed",
+   "feasts": [
+    "تذكار رسامته",
+    "نياحته"
+   ]
+  },
+  {
+   "id": "youannes",
+   "name": "الأنبا يوأنس أسقف الغربية",
+   "cat": "bishops",
+   "class": "reposed",
+   "feasts": [
+    "تذكار رسامته",
+    "نياحته"
+   ]
+  },
+  {
+   "id": "karasmahalla",
+   "name": "الأنبا كاراس أسقف المحلة",
+   "cat": "bishops",
+   "class": "reposed",
+   "feasts": [
+    "تذكار رسامته",
+    "نياحته"
+   ]
+  },
+  {
+   "id": "bishoykamel",
+   "name": "القديس القمص بيشوي كامل",
+   "cat": "fathers",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "yostos",
+   "name": "القديس أبونا يسطس الأنطوني",
+   "cat": "fathers",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "abdelmessih",
+   "name": "أبونا عبد المسيح المناهري",
+   "cat": "fathers",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "faltaos",
+   "name": "أبونا فلتاؤس السرياني",
+   "cat": "fathers",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "abdelmessihhabashy",
+   "name": "أبونا عبد المسيح الحبشي",
+   "cat": "fathers",
+   "class": "reposed",
+   "feasts": []
+  },
+  {
+   "id": "andraos",
+   "name": "أبونا أندراوس الصموئيلي",
+   "cat": "fathers",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "behiry",
+   "name": "القديس القمص ميخائيل البحيري",
+   "cat": "fathers",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "mikhailibrahim",
+   "name": "القمص ميخائيل إبراهيم",
+   "cat": "fathers",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "salibsoryal",
+   "name": "القمص صليب سوريال",
+   "cat": "fathers",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "youssefasaad",
+   "name": "القمص يوسف أسعد",
+   "cat": "fathers",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "morcosdawood",
+   "name": "القمص مرقس داود",
+   "cat": "fathers",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "lukasidarous",
+   "name": "القمص لوقا سيداروس",
+   "cat": "fathers",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "mattaelmeskeen",
+   "name": "القمص متى المسكين",
+   "cat": "fathers",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "simon",
+   "name": "القديس سمعان الخراز",
+   "cat": "laity",
+   "class": "reposed",
+   "feasts": [
+    "تذكار نقل جبل المقطم"
+   ]
+  },
+  {
+   "id": "gohary",
+   "name": "المعلم إبراهيم الجوهري",
+   "cat": "laity",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "habibgirgis",
+   "name": "القديس الأرشيدياكون حبيب جرجس",
+   "cat": "laity",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "ephrem",
+   "name": "القديس مار أفرام السرياني",
+   "cat": "teachers",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "severus",
+   "name": "القديس ساويرس الأنطاكي",
+   "cat": "teachers",
+   "class": "reposed",
+   "feasts": [
+    "نياحته"
+   ]
+  },
+  {
+   "id": "isaacsyrian",
+   "name": "القديس مار إسحق السرياني",
+   "cat": "teachers",
+   "class": "reposed",
+   "feasts": []
+  },
+  {
+   "id": "angelosmourad",
+   "name": "أبونا أنجيلوس مراد",
+   "cat": "ourchurch",
+   "class": "living",
+   "feasts": [
+    "عيد رسامته"
+   ]
+  },
+  {
+   "id": "philopaterromany",
+   "name": "أبونا فيلوباتير روماني",
+   "cat": "ourchurch",
+   "class": "living",
+   "feasts": [
+    "عيد رسامته"
+   ]
+  },
+  {
+   "id": "ibrahimisravim",
+   "name": "القمص إبراهيم إسراڤيم",
+   "cat": "ourchurch",
+   "class": "living",
+   "feasts": [
+    "عيد رسامته قس",
+    "عيد ترقيته قمص"
+   ]
+  },
+  {
+   "id": "isaacnabih",
+   "name": "القمص إسحاق نبيه",
+   "cat": "ourchurch",
+   "class": "living",
+   "feasts": [
+    "عيد رسامته"
+   ]
+  }
+ ],
+ "pending": [
+  {
+   "person": "abraam",
+   "need": "صورة حقيقية بدل صورة الذكاء الاصطناعي (قرار صاحب المشروع)",
+   "note": "الملف اللي على Wikimedia (StAbram icon.jpg، 650×1072، 41 KB، Public Domain) Commons نفسه بيوصفه «أيقونة»، وهو رسم ملوّن من صورته القديمة، مش صورة فوتوغرافية. مفيش صورة فوتوغرافية أوضح على Commons. لحد ما صاحب المشروع يقرر: صورة الذكاء الاصطناعي بتفضل في الألبوم ومش أساسية"
+  }
+ ],
+ "pictures": [
+  {
+   "key": "mary-1",
+   "person": "mary",
+   "name": "السيدة العذراء مريم",
+   "cat": "angels",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/02 - السيدة العذراء مريم.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 3149
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 91.3,
+    "q": 72,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 51.5,
+    "q": 72
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 7.7
+   },
+   "color": "#96735e"
+  },
+  {
+   "key": "michael-1",
+   "person": "michael",
+   "name": "رئيس الملائكة ميخائيل",
+   "cat": "angels",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/05 - رئيس الملائكة ميخائيل.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2578
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 86.3,
+    "q": 76,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 35.2,
+    "q": 76
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 5.7
+   },
+   "color": "#bf6f3e"
+  },
+  {
+   "key": "gabriel-1",
+   "person": "gabriel",
+   "name": "رئيس الملائكة غبريال",
+   "cat": "angels",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/06 - رئيس الملائكة غبريال.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 60,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2637
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 87.4,
+    "q": 76,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 36.7,
+    "q": 76
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 5.8
+   },
+   "color": "#ba8a56"
+  },
+  {
+   "key": "raphael-1",
+   "person": "raphael",
+   "name": "رئيس الملائكة روفائيل",
+   "cat": "angels",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/07 - رئيس الملائكة روفائيل.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2790
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 77.7,
+    "q": 76,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 40.4,
+    "q": 72
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 6.5
+   },
+   "color": "#a87b4e"
+  },
+  {
+   "key": "suriel-1",
+   "person": "suriel",
+   "name": "رئيس الملائكة سوريال",
+   "cat": "angels",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/08 - رئيس الملائكة سوريال.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2760
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 87.8,
+    "q": 80,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 37.1,
+    "q": 72
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 5.7
+   },
+   "color": "#a76b36"
+  },
+  {
+   "key": "moses-1",
+   "person": "moses",
+   "name": "موسى النبي",
+   "cat": "prophets",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/09 - موسى النبي.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2603
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 80.5,
+    "q": 76,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 39.6,
+    "q": 80
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 5.2
+   },
+   "color": "#9a5b3c"
+  },
+  {
+   "key": "elijah-1",
+   "person": "elijah",
+   "name": "إيليا النبي",
+   "cat": "prophets",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/10 - إيليا النبي.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 3189
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 83.1,
+    "q": 72,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 48.1,
+    "q": 72
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 6.9
+   },
+   "color": "#9d6846"
+  },
+  {
+   "key": "daniel-1",
+   "person": "daniel",
+   "name": "دانيال النبي",
+   "cat": "prophets",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/11 - دانيال النبي.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2692
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 88.7,
+    "q": 76,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 35.9,
+    "q": 76
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 5.3
+   },
+   "color": "#7c4921"
+  },
+  {
+   "key": "jeremiah-1",
+   "person": "jeremiah",
+   "name": "إرميا النبي",
+   "cat": "prophets",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/12 - إرميا النبي.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 41,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2821
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 84.8,
+    "q": 80,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 39.6,
+    "q": 76
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 5.8
+   },
+   "color": "#92532f"
+  },
+  {
+   "key": "threeyouths-1",
+   "person": "threeyouths",
+   "name": "الفتية الثلاثة القديسين حنانيا وعزريا وميصائيل",
+   "cat": "prophets",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/13 - الفتية الثلاثة حنانيا وعزريا وميصائيل.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2962
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 87.2,
+    "q": 76,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 48.1,
+    "q": 72
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 7.2
+   },
+   "color": "#be6415"
+  },
+  {
+   "key": "baptist-1",
+   "person": "baptist",
+   "name": "القديس يوحنا المعمدان",
+   "cat": "prophets",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/14 - القديس يوحنا المعمدان.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 60,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2787
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 88.4,
+    "q": 80,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 38.4,
+    "q": 72
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 6
+   },
+   "color": "#9c6d48"
+  },
+  {
+   "key": "mark-1",
+   "person": "mark",
+   "name": "مار مرقس الرسول",
+   "cat": "apostles",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/15 - مار مرقس الرسول.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2731
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 86.2,
+    "q": 72,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 38.8,
+    "q": 76
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 5.8
+   },
+   "color": "#955c35"
+  },
+  {
+   "key": "peterpaul-1",
+   "person": "peterpaul",
+   "name": "الرسولان بطرس وبولس",
+   "cat": "apostles",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/16 - الرسولان بطرس وبولس.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2591
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 88.1,
+    "q": 72,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 37.2,
+    "q": 72
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 6.1
+   },
+   "color": "#8e5535"
+  },
+  {
+   "key": "stephen-1",
+   "person": "stephen",
+   "name": "القديس استفانوس أول الشهداء",
+   "cat": "apostles",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/17 - القديس استفانوس أول الشهداء.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 60,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2680
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 88.5,
+    "q": 72,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 39,
+    "q": 76
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 5.8
+   },
+   "color": "#af7246"
+  },
+  {
+   "key": "mercurius-1",
+   "person": "mercurius",
+   "name": "الشهيد العظيم أبي سيفين (فيلوباتير مرقوريوس)",
+   "cat": "martyrs",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/01 - الشهيد العظيم أبي سيفين.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2831
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 85.3,
+    "q": 72,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 35.8,
+    "q": 76
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 5.3
+   },
+   "color": "#aa6c4a"
+  },
+  {
+   "key": "george-1",
+   "person": "george",
+   "name": "الشهيد العظيم مار جرجس",
+   "cat": "martyrs",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/03 - الشهيد العظيم مار جرجس.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 53,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2902
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 82.2,
+    "q": 80,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 39.4,
+    "q": 76
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 5.9
+   },
+   "color": "#9f6943"
+  },
+  {
+   "key": "mina-1",
+   "person": "mina",
+   "name": "الشهيد مار مينا العجايبي",
+   "cat": "martyrs",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/18 - الشهيد مار مينا العجائبي.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2953
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 79,
+    "q": 76,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 40.8,
+    "q": 72
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 6.1
+   },
+   "color": "#995e36"
+  },
+  {
+   "key": "theodore-1",
+   "person": "theodore",
+   "name": "الأمير تادرس الشطبي",
+   "cat": "martyrs",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/23 - الأمير تادرس الشطبي.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 960,
+    "h": 1200,
+    "kb": 1529
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 78.7,
+    "q": 80,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 39.7,
+    "q": 80
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 5.5
+   },
+   "color": "#8e6e5a"
+  },
+  {
+   "key": "theodoreeast-1",
+   "person": "theodoreeast",
+   "name": "الشهيد تادرس المشرقي",
+   "cat": "martyrs",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/24 - الشهيد تادرس المشرقي.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 960,
+    "h": 1200,
+    "kb": 1372
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 74.9,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 39.3,
+    "q": 84
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 5.2
+   },
+   "color": "#815f47"
+  },
+  {
+   "key": "abaskhiron-1",
+   "person": "abaskhiron",
+   "name": "الشهيد أباسخيرون القليني",
+   "cat": "martyrs",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/25 - الشهيد أباسخيرون القليني.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 960,
+    "h": 1200,
+    "kb": 1439
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 85.2,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 37.2,
+    "q": 80
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 5.2
+   },
+   "color": "#8b644d"
+  },
+  {
+   "key": "abufam-1",
+   "person": "abufam",
+   "name": "الشهيد أبو فام الجندي",
+   "cat": "martyrs",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/26 - الشهيد أبو فام الجندي.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 47,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2697
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 88.7,
+    "q": 70,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 39.6,
+    "q": 76
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 6
+   },
+   "color": "#9d7458"
+  },
+  {
+   "key": "victor-1",
+   "person": "victor",
+   "name": "الشهيد مار بقطر بن رومانيوس",
+   "cat": "martyrs",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/27 - الشهيد مار بقطر بن رومانيوس.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 3015
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 84.8,
+    "q": 72,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 46.8,
+    "q": 72
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 6.9
+   },
+   "color": "#a7694b"
+  },
+  {
+   "key": "abakir-1",
+   "person": "abakir",
+   "name": "الشهيدان أباكير ويوحنا",
+   "cat": "martyrs",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/28 - الشهيدان أباكير ويوحنا.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 3199
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 99.5,
+    "q": 72,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 54.9,
+    "q": 72
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 7.5
+   },
+   "color": "#9d6b4f"
+  },
+  {
+   "key": "abanoub-1",
+   "person": "abanoub",
+   "name": "الشهيد أبانوب النهيسي",
+   "cat": "martyrs",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/29 - الشهيد أبانوب النهيسي.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1120,
+    "h": 1400,
+    "kb": 3145
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 77.7,
+    "q": 76,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 41.4,
+    "q": 72
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 5.8
+   },
+   "color": "#c46e15"
+  },
+  {
+   "key": "sergius-1",
+   "person": "sergius",
+   "name": "الشهيدان سرجيوس وواخس",
+   "cat": "martyrs",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/30 - الشهيدان سرجيوس وواخس.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1120,
+    "h": 1400,
+    "kb": 3298
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 92,
+    "q": 72,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 52.5,
+    "q": 72
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 7.4
+   },
+   "color": "#b3691b"
+  },
+  {
+   "key": "james-1",
+   "person": "james",
+   "name": "الشهيد يعقوب المقطع",
+   "cat": "martyrs",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/31 - الشهيد يعقوب المقطع.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 3046
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 76.2,
+    "q": 76,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 39.1,
+    "q": 72
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 5.5
+   },
+   "color": "#a0613b"
+  },
+  {
+   "key": "bidaba-1",
+   "person": "bidaba",
+   "name": "الشهيد الأنبا بضابا ورفيقاه",
+   "cat": "martyrs",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/32 - الشهيد الأنبا بضابا ورفيقاه.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 38,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1086,
+    "h": 1448,
+    "kb": 3334
+   },
+   "card": {
+    "w": 630,
+    "h": 840,
+    "kb": 83.9,
+    "q": 76,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 360,
+    "h": 480,
+    "kb": 43.4,
+    "q": 72
+   },
+   "tiny": {
+    "w": 120,
+    "h": 160,
+    "kb": 6.4
+   },
+   "color": "#a2693a"
+  },
+  {
+   "key": "sevenanthony-1",
+   "person": "sevenanthony",
+   "name": "السبعة شهداء بجبل أنطونيوس",
+   "cat": "martyrs",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/33 - السبعة شهداء بجبل أنطونيوس.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 38,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1086,
+    "h": 1448,
+    "kb": 3092
+   },
+   "card": {
+    "w": 630,
+    "h": 840,
+    "kb": 87.9,
+    "q": 76,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 360,
+    "h": 480,
+    "kb": 45.9,
+    "q": 72
+   },
+   "tiny": {
+    "w": 120,
+    "h": 160,
+    "kb": 6.9
+   },
+   "color": "#ab6736"
+  },
+  {
+   "key": "sidhom-1",
+   "person": "sidhom",
+   "name": "الشهيد سيدهم بشاي",
+   "cat": "martyrs",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الشهيد سيدهم بشاي.jpg",
+   "type": "art",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [
+    "painted"
+   ],
+   "source": "فولدر صاحب المشروع (02). رسم أو أيقونة من النت، الفنان مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 50,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 342,
+    "h": 720,
+    "kb": 62
+   },
+   "card": {
+    "w": 342,
+    "h": 720,
+    "kb": 65.2,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 228,
+    "h": 480,
+    "kb": 34.6,
+    "q": 84
+   },
+   "tiny": {
+    "w": 76,
+    "h": 160,
+    "kb": 3.9
+   },
+   "color": "#8b634b"
+  },
+  {
+   "key": "demiana-1",
+   "person": "demiana",
+   "name": "الشهيدة دميانة",
+   "cat": "martyrs",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/19 - الشهيدة دميانة والأربعون عذراء.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2794
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 89.7,
+    "q": 76,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 46.4,
+    "q": 72
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 6.8
+   },
+   "color": "#a86538"
+  },
+  {
+   "key": "marina-1",
+   "person": "marina",
+   "name": "الشهيدة مارينا",
+   "cat": "martyrs",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/20 - الشهيدة مارينا.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2915
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 81.1,
+    "q": 76,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 42.2,
+    "q": 72
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 6
+   },
+   "color": "#ac6d49"
+  },
+  {
+   "key": "barbara-1",
+   "person": "barbara",
+   "name": "الشهيدة بربارة",
+   "cat": "martyrs",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/21 - الشهيدة بربارة.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2700
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 89.9,
+    "q": 70,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 37,
+    "q": 72
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 5.7
+   },
+   "color": "#a36742"
+  },
+  {
+   "key": "rebecca-1",
+   "person": "rebecca",
+   "name": "الشهيدة رفقة وأولادها الخمسة",
+   "cat": "martyrs",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/22 - الشهيدة رفقة وأولادها الخمسة.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 53,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1121,
+    "h": 1402,
+    "kb": 2956
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 85.9,
+    "q": 76,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 44.8,
+    "q": 72
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 6.9
+   },
+   "color": "#9f6b49"
+  },
+  {
+   "key": "cosmasdamian-1",
+   "person": "cosmasdamian",
+   "name": "القديسان قزمان ودميان وإخوتهما وأمهم",
+   "cat": "martyrs",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/60 - القديسان قزمان ودميان.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 3139
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 77.3,
+    "q": 76,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 39.8,
+    "q": 72
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 6.1
+   },
+   "color": "#a6622c"
+  },
+  {
+   "key": "julius-1",
+   "person": "julius",
+   "name": "الشهيد يوليوس الأقفهصي",
+   "cat": "martyrs",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/65 - الشهيد يوليوس الأقفهصي.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 60,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2879
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 87.1,
+    "q": 80,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 37.6,
+    "q": 72
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 5.8
+   },
+   "color": "#b46e3c"
+  },
+  {
+   "key": "modernmartyrs-1",
+   "person": "modernmartyrs",
+   "name": "شهداء ليبيا وشهداء العصر الحديث",
+   "cat": "modern",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/شهداء ليبيا وشهداء العصر الحديث.jpg",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [
+    "collage",
+    "text"
+   ],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 67,
+    "y": 50,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 500,
+    "h": 330,
+    "kb": 42
+   },
+   "card": {
+    "w": 500,
+    "h": 330,
+    "kb": 46.1,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 480,
+    "h": 317,
+    "kb": 38.1,
+    "q": 80
+   },
+   "tiny": {
+    "w": 160,
+    "h": 106,
+    "kb": 5.8
+   },
+   "color": "#9ca2a3"
+  },
+  {
+   "key": "minaaboud-1",
+   "person": "minaaboud",
+   "name": "الشهيد القس مينا عبود شاروبيم",
+   "cat": "modern",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الشهيد القس مينا عبود شاروبيم.jpg",
+   "type": "art",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [
+    "painted",
+    "text"
+   ],
+   "source": "فولدر صاحب المشروع (02). رسم أو أيقونة من النت، الفنان مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 37,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 364,
+    "h": 549,
+    "kb": 28
+   },
+   "card": {
+    "w": 364,
+    "h": 549,
+    "kb": 28.2,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 318,
+    "h": 480,
+    "kb": 22.9,
+    "q": 84
+   },
+   "tiny": {
+    "w": 106,
+    "h": 160,
+    "kb": 2.9
+   },
+   "color": "#997e6b"
+  },
+  {
+   "key": "anthony-1",
+   "person": "anthony",
+   "name": "القديس الأنبا أنطونيوس",
+   "cat": "ascetics",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/04 - القديس الأنبا أنطونيوس.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 60,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2650
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 89.4,
+    "q": 76,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 36.5,
+    "q": 76
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 5.3
+   },
+   "color": "#7a5134"
+  },
+  {
+   "key": "paul-1",
+   "person": "paul",
+   "name": "القديس الأنبا بولا أول السواح",
+   "cat": "ascetics",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/34 - القديس الأنبا بولا أول السواح.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2857
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 84.3,
+    "q": 76,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 37.8,
+    "q": 80
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 4.5
+   },
+   "color": "#704d34"
+  },
+  {
+   "key": "macarius-1",
+   "person": "macarius",
+   "name": "القديس الأنبا مقار الكبير",
+   "cat": "ascetics",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/35 - القديس الأنبا مقار الكبير.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2556
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 84.1,
+    "q": 80,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 34,
+    "q": 80
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 4.1
+   },
+   "color": "#744f36"
+  },
+  {
+   "key": "macariusalex-1",
+   "person": "macariusalex",
+   "name": "القديس مقاريوس السكندري",
+   "cat": "ascetics",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/36 - القديس الأنبا مقاريوس السكندري.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2743
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 78.3,
+    "q": 76,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 36.1,
+    "q": 80
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 4.5
+   },
+   "color": "#785b43"
+  },
+  {
+   "key": "bishoy-1",
+   "person": "bishoy",
+   "name": "القديس الأنبا بيشوي",
+   "cat": "ascetics",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/37 - القديس الأنبا بيشوي.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2899
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 88.8,
+    "q": 70,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 39.6,
+    "q": 76
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 5.5
+   },
+   "color": "#9b6b41"
+  },
+  {
+   "key": "mosesblack-1",
+   "person": "mosesblack",
+   "name": "القديس الأنبا موسى الأسود",
+   "cat": "ascetics",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/38 - القديس الأنبا موسى الأسود.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2715
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 77.3,
+    "q": 76,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 35.4,
+    "q": 80
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 4.4
+   },
+   "color": "#72533b"
+  },
+  {
+   "key": "johnshort-1",
+   "person": "johnshort",
+   "name": "القديس الأنبا يحنس القصير",
+   "cat": "ascetics",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/39 - القديس الأنبا يحنس القصير.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2953
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 86.3,
+    "q": 72,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 34.8,
+    "q": 76
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 4.7
+   },
+   "color": "#95653f"
+  },
+  {
+   "key": "maximus-1",
+   "person": "maximus",
+   "name": "القديسان مكسيموس ودوماديوس",
+   "cat": "ascetics",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/40 - القديسان مكسيموس ودوماديوس.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2885
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 84.4,
+    "q": 80,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 39.1,
+    "q": 76
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 5.9
+   },
+   "color": "#6c4d39"
+  },
+  {
+   "key": "pachom-1",
+   "person": "pachom",
+   "name": "القديس الأنبا باخوميوس أب الشركة",
+   "cat": "ascetics",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/41 - القديس الأنبا باخوميوس أب الشركة.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2583
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 88.3,
+    "q": 80,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 34.3,
+    "q": 80
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 4.6
+   },
+   "color": "#6a5448"
+  },
+  {
+   "key": "shenoute-1",
+   "person": "shenoute",
+   "name": "القديس الأنبا شنودة رئيس المتوحدين",
+   "cat": "ascetics",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/42 - القديس الأنبا شنودة رئيس المتوحدين.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2529
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 84,
+    "q": 80,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 34.5,
+    "q": 80
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 4.5
+   },
+   "color": "#745f4f"
+  },
+  {
+   "key": "karas-1",
+   "person": "karas",
+   "name": "القديس الأنبا كاراس السائح",
+   "cat": "ascetics",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/43 - القديس الأنبا كاراس السائح.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2840
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 86.5,
+    "q": 76,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 39.7,
+    "q": 80
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 4.8
+   },
+   "color": "#775132"
+  },
+  {
+   "key": "samuel-1",
+   "person": "samuel",
+   "name": "القديس الأنبا صموئيل المعترف",
+   "cat": "ascetics",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/44 - القديس الأنبا صموئيل المعترف.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2781
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 83,
+    "q": 76,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 37.9,
+    "q": 80
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 4.7
+   },
+   "color": "#835a3d"
+  },
+  {
+   "key": "takla-1",
+   "person": "takla",
+   "name": "القديس الأنبا تكلا هيمانوت",
+   "cat": "ascetics",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/45 - القديس الأنبا تكلا هيمانوت الحبشي.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 3089
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 83.8,
+    "q": 76,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 44.3,
+    "q": 72
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 6.3
+   },
+   "color": "#7e5b44"
+  },
+  {
+   "key": "barsoum-1",
+   "person": "barsoum",
+   "name": "القديس الأنبا برسوم العريان",
+   "cat": "ascetics",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/46 - القديس الأنبا برسوم العريان.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 3261
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 88.5,
+    "q": 80,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 39.9,
+    "q": 72
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 5.4
+   },
+   "color": "#a5754c"
+  },
+  {
+   "key": "reweis-1",
+   "person": "reweis",
+   "name": "القديس الأنبا رويس",
+   "cat": "ascetics",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/47 - القديس الأنبا رويس.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2772
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 84.7,
+    "q": 76,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 38.8,
+    "q": 80
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 4.7
+   },
+   "color": "#a16131"
+  },
+  {
+   "key": "hedraaswan-1",
+   "person": "hedraaswan",
+   "name": "القديس الأنبا هدرا الأسواني",
+   "cat": "ascetics",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/48 - القديس الأنبا هدرا الأسواني.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2848
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 87.4,
+    "q": 70,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 37.3,
+    "q": 76
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 5.5
+   },
+   "color": "#a56131"
+  },
+  {
+   "key": "sarapamonabutarha-1",
+   "person": "sarapamonabutarha",
+   "name": "القديس الأنبا صرابامون أبو طرحة",
+   "cat": "ascetics",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/49 - القديس الأنبا صرابامون أبو طرحة.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2836
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 81.7,
+    "q": 80,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 37.9,
+    "q": 76
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 5.4
+   },
+   "color": "#b16635"
+  },
+  {
+   "key": "yohanneskama-1",
+   "person": "yohanneskama",
+   "name": "القديس الأنبا يحنس كاما",
+   "cat": "ascetics",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/50 - القديس الأنبا يحنس كاما.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2598
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 75.9,
+    "q": 76,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 35.7,
+    "q": 80
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 4.5
+   },
+   "color": "#865026"
+  },
+  {
+   "key": "marycopt-1",
+   "person": "marycopt",
+   "name": "القديسة مريم المصرية",
+   "cat": "ascetics",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/51 - القديسة مريم المصرية.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2957
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 85,
+    "q": 72,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 48.9,
+    "q": 72
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 6.5
+   },
+   "color": "#a86d3e"
+  },
+  {
+   "key": "verena-1",
+   "person": "verena",
+   "name": "القديسة فيرينا",
+   "cat": "ascetics",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/63 - القديسة فيرينا.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2706
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 89.8,
+    "q": 80,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 39.8,
+    "q": 84
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 4.4
+   },
+   "color": "#be6e33"
+  },
+  {
+   "key": "athanasius-1",
+   "person": "athanasius",
+   "name": "القديس البابا أثناسيوس الرسولي",
+   "cat": "popes",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/52 - القديس البابا أثناسيوس الرسولي.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 3166
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 94.6,
+    "q": 72,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 53.9,
+    "q": 72
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 7
+   },
+   "color": "#ab6d36"
+  },
+  {
+   "key": "peterseal-1",
+   "person": "peterseal",
+   "name": "القديس البابا بطرس خاتم الشهداء",
+   "cat": "popes",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/53 - القديس البابا بطرس الأول خاتم الشهداء.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 3043
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 85,
+    "q": 72,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 47.2,
+    "q": 72
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 6.5
+   },
+   "color": "#b1743e"
+  },
+  {
+   "key": "cyril-1",
+   "person": "cyril",
+   "name": "القديس البابا كيرلس عمود الدين",
+   "cat": "popes",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/54 - القديس البابا كيرلس الكبير عمود الدين.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 44,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 3191
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 84.6,
+    "q": 72,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 47.9,
+    "q": 72
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 6.6
+   },
+   "color": "#a0693a"
+  },
+  {
+   "key": "dioscorus-1",
+   "person": "dioscorus",
+   "name": "القديس البابا ديسقورس",
+   "cat": "popes",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/55 - القديس البابا ديسقورس الأول.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 3091
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 88.9,
+    "q": 72,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 50.5,
+    "q": 72
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 6.7
+   },
+   "color": "#af6f3c"
+  },
+  {
+   "key": "matthew1-1",
+   "person": "matthew1",
+   "name": "القديس البابا متاؤس الأول",
+   "cat": "popes",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/56 - القديس البابا متاؤس الأول.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 3090
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 86.1,
+    "q": 76,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 43.8,
+    "q": 72
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 6.2
+   },
+   "color": "#ae693d"
+  },
+  {
+   "key": "cyril4-1",
+   "person": "cyril4",
+   "name": "البابا كيرلس الرابع أبو الإصلاح",
+   "cat": "popes",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/البابا كيرلس الرابع — أبو الإصلاح.jpg",
+   "type": "art",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [
+    "painted"
+   ],
+   "source": "فولدر صاحب المشروع (02). رسم أو أيقونة من النت، الفنان مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 44,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 466,
+    "h": 658,
+    "kb": 41
+   },
+   "card": {
+    "w": 466,
+    "h": 658,
+    "kb": 48,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 340,
+    "h": 480,
+    "kb": 30.6,
+    "q": 84
+   },
+   "tiny": {
+    "w": 113,
+    "h": 160,
+    "kb": 3.3
+   },
+   "color": "#beaa82"
+  },
+  {
+   "key": "cyril5-1",
+   "person": "cyril5",
+   "name": "القديس البابا كيرلس الخامس",
+   "cat": "popes",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/القديس البابا كيرلس الخامس.jpg",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [
+    "watermark"
+   ],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 66,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 413,
+    "h": 600,
+    "kb": 40
+   },
+   "card": {
+    "w": 413,
+    "h": 600,
+    "kb": 41.1,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 330,
+    "h": 480,
+    "kb": 29.5,
+    "q": 84
+   },
+   "tiny": {
+    "w": 110,
+    "h": 160,
+    "kb": 2.8
+   },
+   "color": "#976f61"
+  },
+  {
+   "key": "cyril6-1",
+   "person": "cyril6",
+   "name": "القديس البابا كيرلس السادس",
+   "cat": "popes",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/القديس البابا كيرلس السادس.jpg",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 34,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 458,
+    "h": 664,
+    "kb": 46
+   },
+   "card": {
+    "w": 458,
+    "h": 664,
+    "kb": 33.3,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 331,
+    "h": 480,
+    "kb": 19.4,
+    "q": 84
+   },
+   "tiny": {
+    "w": 110,
+    "h": 160,
+    "kb": 2.3
+   },
+   "color": "#6f4d39"
+  },
+  {
+   "key": "shenouda3-1",
+   "person": "shenouda3",
+   "name": "البابا شنودة الثالث",
+   "cat": "popes",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/البابا شنودة الثالث.jpg",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 53,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 2333,
+    "h": 3500,
+    "kb": 2151
+   },
+   "card": {
+    "w": 560,
+    "h": 840,
+    "kb": 52.4,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 320,
+    "h": 480,
+    "kb": 21.9,
+    "q": 84
+   },
+   "tiny": {
+    "w": 107,
+    "h": 160,
+    "kb": 2.7
+   },
+   "color": "#63412f"
+  },
+  {
+   "key": "tawadros2-1",
+   "person": "tawadros2",
+   "name": "البابا تواضروس الثاني",
+   "cat": "popes",
+   "class": "living",
+   "src": "03-الأحياء-صور-حقيقية/البابا تواضروس الثاني.jpg",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 50,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1000,
+    "h": 1000,
+    "kb": 186
+   },
+   "card": {
+    "w": 840,
+    "h": 840,
+    "kb": 98,
+    "q": 72,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 480,
+    "h": 480,
+    "kb": 55.3,
+    "q": 72
+   },
+   "tiny": {
+    "w": 160,
+    "h": 160,
+    "kb": 7.6
+   },
+   "color": "#c19d86"
+  },
+  {
+   "key": "abraam-1",
+   "person": "abraam",
+   "name": "القديس الأنبا إبرآم أسقف الفيوم والجيزة",
+   "cat": "bishops",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/57 - القديس الأنبا إبرآم أسقف الفيوم والجيزة.png",
+   "type": "ai",
+   "main": false,
+   "stage": "",
+   "occasion": "",
+   "ask": "صاحب المشروع قرر صورة حقيقية بدلها. لحد ما نجيبها: بتفضل في الألبوم ومش أساسية.",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 37,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1074,
+    "h": 1440,
+    "kb": 1915
+   },
+   "card": {
+    "w": 627,
+    "h": 840,
+    "kb": 87.1,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 358,
+    "h": 480,
+    "kb": 34.4,
+    "q": 80
+   },
+   "tiny": {
+    "w": 119,
+    "h": 160,
+    "kb": 4.5
+   },
+   "color": "#6e5845"
+  },
+  {
+   "key": "yousababah-1",
+   "person": "yousababah",
+   "name": "القديس الأنبا يوساب الأبح أسقف جرجا",
+   "cat": "bishops",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/58 - القديس الأنبا يوساب الأبح أسقف جرجا.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 59,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1074,
+    "h": 1440,
+    "kb": 2309
+   },
+   "card": {
+    "w": 627,
+    "h": 840,
+    "kb": 86.9,
+    "q": 72,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 358,
+    "h": 480,
+    "kb": 40.9,
+    "q": 72
+   },
+   "tiny": {
+    "w": 119,
+    "h": 160,
+    "kb": 6
+   },
+   "color": "#b4815e"
+  },
+  {
+   "key": "sarapamonkhartoum-1",
+   "person": "sarapamonkhartoum",
+   "name": "القديس الأنبا صرابامون مطران الخرطوم",
+   "cat": "bishops",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا صرابامون مطران الخرطوم.jpg",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [
+    "watermark"
+   ],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 41,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 747,
+    "h": 940,
+    "kb": 192
+   },
+   "card": {
+    "w": 668,
+    "h": 840,
+    "kb": 46.4,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 381,
+    "h": 480,
+    "kb": 20.2,
+    "q": 84
+   },
+   "tiny": {
+    "w": 127,
+    "h": 160,
+    "kb": 2.5
+   },
+   "color": "#726c63"
+  },
+  {
+   "key": "kirolloskena-1",
+   "person": "kirolloskena",
+   "name": "الأنبا كيرلس مطران قنا ومحافظات البحر الأحمر",
+   "cat": "bishops",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا كيرلس مطران قنا ومحافظات البحر الأحمر.jpg",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 32,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 471,
+    "h": 736,
+    "kb": 23
+   },
+   "card": {
+    "w": 471,
+    "h": 736,
+    "kb": 19.8,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 307,
+    "h": 480,
+    "kb": 11.9,
+    "q": 84
+   },
+   "tiny": {
+    "w": 102,
+    "h": 160,
+    "kb": 1.7
+   },
+   "color": "#50453f"
+  },
+  {
+   "key": "makariosqena-1",
+   "person": "makariosqena",
+   "name": "القديس الأنبا مكاريوس أسقف قنا",
+   "cat": "bishops",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا مكاريوس أسقف قنا.jpg",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 35,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 462,
+    "h": 664,
+    "kb": 29
+   },
+   "card": {
+    "w": 462,
+    "h": 664,
+    "kb": 31,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 334,
+    "h": 480,
+    "kb": 20.8,
+    "q": 84
+   },
+   "tiny": {
+    "w": 111,
+    "h": 160,
+    "kb": 3.1
+   },
+   "color": "#9f9195"
+  },
+  {
+   "key": "theophilus-1",
+   "person": "theophilus",
+   "name": "الأنبا ثاؤفيلس أول أسقف للبحر الأحمر",
+   "cat": "bishops",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا ثاؤفيلس 5.jpg",
+   "type": "photo",
+   "main": false,
+   "stage": "",
+   "occasion": "",
+   "ask": "مناسبة كنسية (حاجة بتتحط بالطين على عمود). مين هو فيها، وفي أنهي مرحلة؟",
+   "flags": [
+    "group"
+   ],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 38,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 720,
+    "h": 960,
+    "kb": 64
+   },
+   "card": {
+    "w": 630,
+    "h": 840,
+    "kb": 53.2,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 360,
+    "h": 480,
+    "kb": 26.7,
+    "q": 84
+   },
+   "tiny": {
+    "w": 120,
+    "h": 160,
+    "kb": 3.8
+   },
+   "color": "#8b6c64"
+  },
+  {
+   "key": "theophilus-2",
+   "person": "theophilus",
+   "name": "الأنبا ثاؤفيلس أول أسقف للبحر الأحمر",
+   "cat": "bishops",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا ثاؤفيلس 6.jpg",
+   "type": "photo",
+   "main": false,
+   "stage": "",
+   "occasion": "",
+   "ask": "أب أسقف كبير في السن ومعاه راهب بالشورية. مين هو فيها، وفي أنهي مرحلة؟",
+   "flags": [
+    "group"
+   ],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 53,
+    "y": 50,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 960,
+    "h": 898,
+    "kb": 43
+   },
+   "card": {
+    "w": 840,
+    "h": 786,
+    "kb": 29,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 480,
+    "h": 449,
+    "kb": 15,
+    "q": 84
+   },
+   "tiny": {
+    "w": 160,
+    "h": 149,
+    "kb": 2.5
+   },
+   "color": "#493f41"
+  },
+  {
+   "key": "theophilus-3",
+   "person": "theophilus",
+   "name": "الأنبا ثاؤفيلس أول أسقف للبحر الأحمر",
+   "cat": "bishops",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا ثاؤفيلس 7.jpg",
+   "type": "photo",
+   "main": false,
+   "stage": "الأسقفية (١٩٩٢–٢٠١٩)",
+   "occasion": "",
+   "ask": "تدشين مذبح (الآباء بالتونية البيضا). مين هو فيها، وأنهي كنيسة؟",
+   "flags": [
+    "group"
+   ],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 53,
+    "y": 50,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 960,
+    "h": 720,
+    "kb": 35
+   },
+   "card": {
+    "w": 840,
+    "h": 630,
+    "kb": 24.2,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 480,
+    "h": 360,
+    "kb": 13.1,
+    "q": 84
+   },
+   "tiny": {
+    "w": 160,
+    "h": 120,
+    "kb": 1.7
+   },
+   "color": "#7b797a"
+  },
+  {
+   "key": "theophilus-4",
+   "person": "theophilus",
+   "name": "الأنبا ثاؤفيلس أول أسقف للبحر الأحمر",
+   "cat": "bishops",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا ثاؤفيلس أول أسقف للبحر الأحمر-2.jpg",
+   "type": "photo",
+   "main": false,
+   "stage": "الأسقفية (١٩٩٢–٢٠١٩)",
+   "occasion": "تذكار رسامته",
+   "ask": "صورة شخصية صغيرة (200×264). تنفع للقوايم بس.",
+   "flags": [
+    "watermark"
+   ],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 38,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 200,
+    "h": 264,
+    "kb": 7
+   },
+   "card": {
+    "w": 200,
+    "h": 264,
+    "kb": 5.3,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 200,
+    "h": 264,
+    "kb": 5.3,
+    "q": 84
+   },
+   "tiny": {
+    "w": 121,
+    "h": 160,
+    "kb": 1.6
+   },
+   "color": "#78605f"
+  },
+  {
+   "key": "theophilus-5",
+   "person": "theophilus",
+   "name": "الأنبا ثاؤفيلس أول أسقف للبحر الأحمر",
+   "cat": "bishops",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا ثاؤفيلس أول أسقف للبحر الأحمر.jpg",
+   "type": "photo",
+   "main": false,
+   "stage": "سنينه الأخيرة",
+   "occasion": "نياحته",
+   "ask": "بيضحك (لقطة من لقاء تليفزيوني). عريضة، فبتتقص في الإطارات المربعة.",
+   "flags": [],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 28,
+    "y": 50,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 550,
+    "h": 289,
+    "kb": 16
+   },
+   "card": {
+    "w": 550,
+    "h": 289,
+    "kb": 13.3,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 480,
+    "h": 252,
+    "kb": 10.7,
+    "q": 84
+   },
+   "tiny": {
+    "w": 160,
+    "h": 84,
+    "kb": 1.6
+   },
+   "color": "#77686f"
+  },
+  {
+   "key": "theophilus-6",
+   "person": "theophilus",
+   "name": "الأنبا ثاؤفيلس أول أسقف للبحر الأحمر",
+   "cat": "bishops",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا ثاؤفيلس أول أسقف للبحر الأحمر3.jpg",
+   "type": "photo",
+   "main": true,
+   "stage": "الأسقفية (١٩٩٢–٢٠١٩)",
+   "occasion": "تذكار رسامته",
+   "ask": "مقترحة أساسية: أوضح صورة ليه وهو أسقف، بيبخّر في الكنيسة.",
+   "flags": [],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 65,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 678,
+    "h": 960,
+    "kb": 230
+   },
+   "card": {
+    "w": 593,
+    "h": 840,
+    "kb": 78.7,
+    "q": 80,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 339,
+    "h": 480,
+    "kb": 26.1,
+    "q": 84
+   },
+   "tiny": {
+    "w": 113,
+    "h": 160,
+    "kb": 2.3
+   },
+   "color": "#61657b"
+  },
+  {
+   "key": "theophilus-7",
+   "person": "theophilus",
+   "name": "الأنبا ثاؤفيلس أول أسقف للبحر الأحمر",
+   "cat": "bishops",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا ثاؤفيلس أول أسقف للبحر الأحمر4.jpg",
+   "type": "photo",
+   "main": false,
+   "stage": "سنينه الأخيرة",
+   "occasion": "نياحته",
+   "ask": "شايل الصليب وبيتكلم في الميكروفون.",
+   "flags": [],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 53,
+    "y": 50,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 678,
+    "h": 452,
+    "kb": 30
+   },
+   "card": {
+    "w": 678,
+    "h": 452,
+    "kb": 33.6,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 480,
+    "h": 320,
+    "kb": 21.9,
+    "q": 84
+   },
+   "tiny": {
+    "w": 160,
+    "h": 107,
+    "kb": 3.1
+   },
+   "color": "#876350"
+  },
+  {
+   "key": "ilarion-1",
+   "person": "ilarion",
+   "name": "الأنبا إيلاريون أسقف البحر الأحمر",
+   "cat": "bishops",
+   "class": "living",
+   "src": "03-الأحياء-صور-حقيقية/الأنبا إيلاريون.jpg",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 34,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 452,
+    "h": 678,
+    "kb": 32
+   },
+   "card": {
+    "w": 452,
+    "h": 678,
+    "kb": 33.6,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 320,
+    "h": 480,
+    "kb": 20.3,
+    "q": 84
+   },
+   "tiny": {
+    "w": 107,
+    "h": 160,
+    "kb": 3.2
+   },
+   "color": "#614940"
+  },
+  {
+   "key": "hedra-1",
+   "person": "hedra",
+   "name": "الأنبا هدرا مطران أسوان",
+   "cat": "bishops",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا هدرا مطران أسوان.jpg",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 35,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 664,
+    "h": 960,
+    "kb": 42
+   },
+   "card": {
+    "w": 581,
+    "h": 840,
+    "kb": 36,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 332,
+    "h": 480,
+    "kb": 18.3,
+    "q": 84
+   },
+   "tiny": {
+    "w": 111,
+    "h": 160,
+    "kb": 2.6
+   },
+   "color": "#766a5f"
+  },
+  {
+   "key": "pachomius-1",
+   "person": "pachomius",
+   "name": "الأنبا باخوميوس مطران البحيرة",
+   "cat": "bishops",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا باخوميوس مطران البحيرة.jpg",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 35,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 460,
+    "h": 666,
+    "kb": 25
+   },
+   "card": {
+    "w": 460,
+    "h": 666,
+    "kb": 23.2,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 332,
+    "h": 480,
+    "kb": 13.5,
+    "q": 84
+   },
+   "tiny": {
+    "w": 111,
+    "h": 160,
+    "kb": 2.1
+   },
+   "color": "#75707c"
+  },
+  {
+   "key": "bishoydam-1",
+   "person": "bishoydam",
+   "name": "الأنبا بيشوي مطران دمياط",
+   "cat": "bishops",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا بيشوي مطران دمياط.jpg",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [
+    "watermark"
+   ],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 44,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 394,
+    "h": 581,
+    "kb": 26
+   },
+   "card": {
+    "w": 394,
+    "h": 581,
+    "kb": 22.6,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 326,
+    "h": 480,
+    "kb": 17.4,
+    "q": 84
+   },
+   "tiny": {
+    "w": 109,
+    "h": 160,
+    "kb": 2.5
+   },
+   "color": "#485345"
+  },
+  {
+   "key": "samuelserv-1",
+   "person": "samuelserv",
+   "name": "الأنبا صموئيل أسقف الخدمات",
+   "cat": "bishops",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا صموئيل أسقف الخدمات.jpg",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 34,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 454,
+    "h": 675,
+    "kb": 28
+   },
+   "card": {
+    "w": 454,
+    "h": 675,
+    "kb": 28.2,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 323,
+    "h": 480,
+    "kb": 17.4,
+    "q": 84
+   },
+   "tiny": {
+    "w": 108,
+    "h": 160,
+    "kb": 2.6
+   },
+   "color": "#756c65"
+  },
+  {
+   "key": "gregorios-1",
+   "person": "gregorios",
+   "name": "الأنبا غريغوريوس أسقف البحث العلمي",
+   "cat": "bishops",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا غريغوريوس أسقف البحث العلمي.jpg",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 50,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 500,
+    "h": 500,
+    "kb": 58
+   },
+   "card": {
+    "w": 500,
+    "h": 500,
+    "kb": 28.8,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 480,
+    "h": 480,
+    "kb": 25.5,
+    "q": 84
+   },
+   "tiny": {
+    "w": 160,
+    "h": 160,
+    "kb": 3
+   },
+   "color": "#92866f"
+  },
+  {
+   "key": "bimen-1",
+   "person": "bimen",
+   "name": "الأنبا بيمن أسقف ملوي",
+   "cat": "bishops",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا بيمن أسقف ملوي.jpg",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 474,
+    "h": 647,
+    "kb": 54
+   },
+   "card": {
+    "w": 474,
+    "h": 647,
+    "kb": 74.3,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 352,
+    "h": 480,
+    "kb": 36.2,
+    "q": 80
+   },
+   "tiny": {
+    "w": 117,
+    "h": 160,
+    "kb": 4.1
+   },
+   "color": "#6c594f"
+  },
+  {
+   "key": "mikhailassiut-1",
+   "person": "mikhailassiut",
+   "name": "الأنبا ميخائيل مطران أسيوط",
+   "cat": "bishops",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا ميخائيل مطران أسيوط.jpg",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 38,
+    "y": 50,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 604,
+    "h": 453,
+    "kb": 43
+   },
+   "card": {
+    "w": 604,
+    "h": 453,
+    "kb": 24.5,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 480,
+    "h": 360,
+    "kb": 17.7,
+    "q": 84
+   },
+   "tiny": {
+    "w": 160,
+    "h": 120,
+    "kb": 3
+   },
+   "color": "#717676"
+  },
+  {
+   "key": "epiphanius-1",
+   "person": "epiphanius",
+   "name": "الأنبا إبيفانيوس أسقف دير أبو مقار",
+   "cat": "bishops",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا إبيفانيوس أسقف دير أبو مقار.jpg",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [
+    "watermark"
+   ],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 45,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 517,
+    "h": 575,
+    "kb": 35
+   },
+   "card": {
+    "w": 517,
+    "h": 575,
+    "kb": 33.7,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 432,
+    "h": 480,
+    "kb": 25.6,
+    "q": 84
+   },
+   "tiny": {
+    "w": 144,
+    "h": 160,
+    "kb": 3
+   },
+   "color": "#704843"
+  },
+  {
+   "key": "athanasiusbs-1",
+   "person": "athanasiusbs",
+   "name": "الأنبا أثناسيوس مطران بني سويف",
+   "cat": "bishops",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا أثناسيوس مطران بني سويف.jpg",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 399,
+    "h": 501,
+    "kb": 23
+   },
+   "card": {
+    "w": 399,
+    "h": 501,
+    "kb": 19.9,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 382,
+    "h": 480,
+    "kb": 18.7,
+    "q": 84
+   },
+   "tiny": {
+    "w": 127,
+    "h": 160,
+    "kb": 3.1
+   },
+   "color": "#b19d8f"
+  },
+  {
+   "key": "youannes-1",
+   "person": "youannes",
+   "name": "الأنبا يوأنس أسقف الغربية",
+   "cat": "bishops",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا يوأنس أسقف الغربية.jpg",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 35,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 503,
+    "h": 720,
+    "kb": 40
+   },
+   "card": {
+    "w": 503,
+    "h": 720,
+    "kb": 28.9,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 335,
+    "h": 480,
+    "kb": 15.6,
+    "q": 84
+   },
+   "tiny": {
+    "w": 112,
+    "h": 160,
+    "kb": 2.3
+   },
+   "color": "#7f726a"
+  },
+  {
+   "key": "karasmahalla-1",
+   "person": "karasmahalla",
+   "name": "الأنبا كاراس أسقف المحلة",
+   "cat": "bishops",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا كاراس أسقف المحلة.jpg",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 33,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 391,
+    "h": 600,
+    "kb": 35
+   },
+   "card": {
+    "w": 391,
+    "h": 600,
+    "kb": 30,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 313,
+    "h": 480,
+    "kb": 21.2,
+    "q": 84
+   },
+   "tiny": {
+    "w": 104,
+    "h": 160,
+    "kb": 2.6
+   },
+   "color": "#6c5f5c"
+  },
+  {
+   "key": "bishoykamel-1",
+   "person": "bishoykamel",
+   "name": "القديس القمص بيشوي كامل",
+   "cat": "fathers",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/القديس القمص بيشوي كامل.jpg",
+   "type": "art",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [
+    "painted"
+   ],
+   "source": "فولدر صاحب المشروع (02). رسم أو أيقونة من النت، الفنان مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 41,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 369,
+    "h": 542,
+    "kb": 22
+   },
+   "card": {
+    "w": 369,
+    "h": 542,
+    "kb": 20,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 327,
+    "h": 480,
+    "kb": 16.5,
+    "q": 84
+   },
+   "tiny": {
+    "w": 109,
+    "h": 160,
+    "kb": 2.3
+   },
+   "color": "#6e7679"
+  },
+  {
+   "key": "yostos-1",
+   "person": "yostos",
+   "name": "القديس أبونا يسطس الأنطوني",
+   "cat": "fathers",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/القديس أبونا يسطس الأنطوني.jpg",
+   "type": "art",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [
+    "painted"
+   ],
+   "source": "فولدر صاحب المشروع (02). رسم أو أيقونة من النت، الفنان مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 37,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 478,
+    "h": 642,
+    "kb": 33
+   },
+   "card": {
+    "w": 478,
+    "h": 642,
+    "kb": 36.1,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 357,
+    "h": 480,
+    "kb": 23.9,
+    "q": 84
+   },
+   "tiny": {
+    "w": 119,
+    "h": 160,
+    "kb": 3.3
+   },
+   "color": "#574a38"
+  },
+  {
+   "key": "abdelmessih-1",
+   "person": "abdelmessih",
+   "name": "أبونا عبد المسيح المناهري",
+   "cat": "fathers",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/أبونا عبد المسيح المناهري.jpg",
+   "type": "art",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [
+    "painted",
+    "watermark"
+   ],
+   "source": "فولدر صاحب المشروع (02). رسم أو أيقونة من النت، الفنان مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 34,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 236,
+    "h": 349,
+    "kb": 30
+   },
+   "card": {
+    "w": 236,
+    "h": 349,
+    "kb": 29.8,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 236,
+    "h": 349,
+    "kb": 29.8,
+    "q": 84
+   },
+   "tiny": {
+    "w": 108,
+    "h": 160,
+    "kb": 2.8
+   },
+   "color": "#7f7978"
+  },
+  {
+   "key": "faltaos-1",
+   "person": "faltaos",
+   "name": "أبونا فلتاؤس السرياني",
+   "cat": "fathers",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/أبونا فلتاؤس السرياني.jpg",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [
+    "text"
+   ],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 41,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 383,
+    "h": 522,
+    "kb": 40
+   },
+   "card": {
+    "w": 383,
+    "h": 522,
+    "kb": 46.9,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 352,
+    "h": 480,
+    "kb": 35.2,
+    "q": 80
+   },
+   "tiny": {
+    "w": 117,
+    "h": 160,
+    "kb": 3.4
+   },
+   "color": "#858289"
+  },
+  {
+   "key": "abdelmessihhabashy-1",
+   "person": "abdelmessihhabashy",
+   "name": "أبونا عبد المسيح الحبشي",
+   "cat": "fathers",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/أبونا عبد المسيح الحبشي.jpg",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 42,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 299,
+    "h": 360,
+    "kb": 36
+   },
+   "card": {
+    "w": 299,
+    "h": 360,
+    "kb": 14.8,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 299,
+    "h": 360,
+    "kb": 14.8,
+    "q": 84
+   },
+   "tiny": {
+    "w": 133,
+    "h": 160,
+    "kb": 2.4
+   },
+   "color": "#8e8a74"
+  },
+  {
+   "key": "andraos-1",
+   "person": "andraos",
+   "name": "أبونا أندراوس الصموئيلي",
+   "cat": "fathers",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/أبونا أندراوس الصموئيلي.jpg",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [
+    "text"
+   ],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 34,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 458,
+    "h": 669,
+    "kb": 40
+   },
+   "card": {
+    "w": 458,
+    "h": 669,
+    "kb": 52.6,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 329,
+    "h": 480,
+    "kb": 35.5,
+    "q": 84
+   },
+   "tiny": {
+    "w": 110,
+    "h": 160,
+    "kb": 3.9
+   },
+   "color": "#a38471"
+  },
+  {
+   "key": "behiry-1",
+   "person": "behiry",
+   "name": "القديس القمص ميخائيل البحيري",
+   "cat": "fathers",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/القديس القمص ميخائيل البحيري.jpg",
+   "type": "art",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [
+    "painted"
+   ],
+   "source": "فولدر صاحب المشروع (02). رسم أو أيقونة من النت، الفنان مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 36,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 736,
+    "h": 1030,
+    "kb": 96
+   },
+   "card": {
+    "w": 600,
+    "h": 840,
+    "kb": 45.9,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 343,
+    "h": 480,
+    "kb": 21,
+    "q": 84
+   },
+   "tiny": {
+    "w": 115,
+    "h": 160,
+    "kb": 3.3
+   },
+   "color": "#607a6d"
+  },
+  {
+   "key": "mikhailibrahim-1",
+   "person": "mikhailibrahim",
+   "name": "القمص ميخائيل إبراهيم",
+   "cat": "fathers",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/القمص ميخائيل إبراهيم.jpg",
+   "type": "art",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [
+    "painted"
+   ],
+   "source": "فولدر صاحب المشروع (02). رسم أو أيقونة من النت، الفنان مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 37,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 378,
+    "h": 529,
+    "kb": 24
+   },
+   "card": {
+    "w": 378,
+    "h": 529,
+    "kb": 22.7,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 343,
+    "h": 480,
+    "kb": 19.8,
+    "q": 84
+   },
+   "tiny": {
+    "w": 115,
+    "h": 160,
+    "kb": 3
+   },
+   "color": "#755d53"
+  },
+  {
+   "key": "salibsoryal-1",
+   "person": "salibsoryal",
+   "name": "القمص صليب سوريال",
+   "cat": "fathers",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/القمص صليب سوريال.jpg",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [
+    "watermark"
+   ],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 37,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 277,
+    "h": 383,
+    "kb": 18
+   },
+   "card": {
+    "w": 277,
+    "h": 383,
+    "kb": 18.7,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 277,
+    "h": 383,
+    "kb": 18.7,
+    "q": 84
+   },
+   "tiny": {
+    "w": 116,
+    "h": 160,
+    "kb": 2.8
+   },
+   "color": "#535750"
+  },
+  {
+   "key": "youssefasaad-1",
+   "person": "youssefasaad",
+   "name": "القمص يوسف أسعد",
+   "cat": "fathers",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/القمص يوسف أسعد.jpg",
+   "type": "art",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [
+    "painted"
+   ],
+   "source": "فولدر صاحب المشروع (02). رسم أو أيقونة من النت، الفنان مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 44,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 634,
+    "h": 925,
+    "kb": 29
+   },
+   "card": {
+    "w": 576,
+    "h": 840,
+    "kb": 18.2,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 329,
+    "h": 480,
+    "kb": 8.9,
+    "q": 84
+   },
+   "tiny": {
+    "w": 109,
+    "h": 160,
+    "kb": 1.4
+   },
+   "color": "#705f4f"
+  },
+  {
+   "key": "morcosdawood-1",
+   "person": "morcosdawood",
+   "name": "القمص مرقس داود",
+   "cat": "fathers",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/القمص مرقس داود.jpg",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [
+    "watermark"
+   ],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 43,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 300,
+    "h": 352,
+    "kb": 10
+   },
+   "card": {
+    "w": 300,
+    "h": 352,
+    "kb": 8,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 300,
+    "h": 352,
+    "kb": 8,
+    "q": 84
+   },
+   "tiny": {
+    "w": 136,
+    "h": 160,
+    "kb": 2
+   },
+   "color": "#8c8c8c"
+  },
+  {
+   "key": "lukasidarous-1",
+   "person": "lukasidarous",
+   "name": "القمص لوقا سيداروس",
+   "cat": "fathers",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/القمص لوقا سيداروس.jpg",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 44,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 568,
+    "h": 640,
+    "kb": 44
+   },
+   "card": {
+    "w": 568,
+    "h": 640,
+    "kb": 39.3,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 426,
+    "h": 480,
+    "kb": 27,
+    "q": 84
+   },
+   "tiny": {
+    "w": 142,
+    "h": 160,
+    "kb": 2.8
+   },
+   "color": "#9a5e18"
+  },
+  {
+   "key": "mattaelmeskeen-1",
+   "person": "mattaelmeskeen",
+   "name": "القمص متى المسكين",
+   "cat": "fathers",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/القمص متى المسكين.jpg",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 31,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 438,
+    "h": 699,
+    "kb": 15
+   },
+   "card": {
+    "w": 438,
+    "h": 699,
+    "kb": 12.1,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 301,
+    "h": 480,
+    "kb": 7.4,
+    "q": 84
+   },
+   "tiny": {
+    "w": 100,
+    "h": 160,
+    "kb": 1.3
+   },
+   "color": "#525252"
+  },
+  {
+   "key": "simon-1",
+   "person": "simon",
+   "name": "القديس سمعان الخراز",
+   "cat": "laity",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/59 - القديس سمعان الخراز.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 37,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1074,
+    "h": 1440,
+    "kb": 2083
+   },
+   "card": {
+    "w": 627,
+    "h": 840,
+    "kb": 83.9,
+    "q": 80,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 358,
+    "h": 480,
+    "kb": 34.8,
+    "q": 76
+   },
+   "tiny": {
+    "w": 119,
+    "h": 160,
+    "kb": 5.3
+   },
+   "color": "#785033"
+  },
+  {
+   "key": "gohary-1",
+   "person": "gohary",
+   "name": "المعلم إبراهيم الجوهري",
+   "cat": "laity",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/المعلم إبراهيم الجوهري.jpg",
+   "type": "art",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [
+    "painted"
+   ],
+   "source": "فولدر صاحب المشروع (02). رسم أو أيقونة من النت، الفنان مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 28,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 398,
+    "h": 771,
+    "kb": 32
+   },
+   "card": {
+    "w": 398,
+    "h": 771,
+    "kb": 36.3,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 248,
+    "h": 480,
+    "kb": 19.1,
+    "q": 84
+   },
+   "tiny": {
+    "w": 83,
+    "h": 160,
+    "kb": 2.6
+   },
+   "color": "#918470"
+  },
+  {
+   "key": "habibgirgis-1",
+   "person": "habibgirgis",
+   "name": "القديس الأرشيدياكون حبيب جرجس",
+   "cat": "laity",
+   "class": "reposed",
+   "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأرشيدياكون القديس حبيب جرجس.jpg",
+   "type": "art",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [
+    "painted"
+   ],
+   "source": "فولدر صاحب المشروع (02). رسم أو أيقونة من النت، الفنان مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 67,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 452,
+    "h": 678,
+    "kb": 44
+   },
+   "card": {
+    "w": 452,
+    "h": 678,
+    "kb": 50.8,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 320,
+    "h": 480,
+    "kb": 30.8,
+    "q": 84
+   },
+   "tiny": {
+    "w": 107,
+    "h": 160,
+    "kb": 4.2
+   },
+   "color": "#9a8886"
+  },
+  {
+   "key": "ephrem-1",
+   "person": "ephrem",
+   "name": "القديس مار أفرام السرياني",
+   "cat": "teachers",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/61 - القديس مار أفرام السرياني.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2740
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 79.9,
+    "q": 76,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 36.7,
+    "q": 80
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 4.7
+   },
+   "color": "#915a2c"
+  },
+  {
+   "key": "severus-1",
+   "person": "severus",
+   "name": "القديس ساويرس الأنطاكي",
+   "cat": "teachers",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/62 - القديس ساويرس الأنطاكي.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 3165
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 86.5,
+    "q": 80,
+    "smooth": true
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 37.9,
+    "q": 72
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 5.7
+   },
+   "color": "#a16338"
+  },
+  {
+   "key": "isaacsyrian-1",
+   "person": "isaacsyrian",
+   "name": "القديس مار إسحق السرياني",
+   "cat": "teachers",
+   "class": "reposed",
+   "src": "01-القديسين-رسومات-AI/64 - القديس مار إسحق السرياني.png",
+   "type": "ai",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "رسم بالذكاء الاصطناعي اتعمل للمشروع (فولدر صاحب المشروع 01)",
+   "terms": "رسم أصلي للمشروع. مفيش حقوق لحد تاني",
+   "crop": {
+    "x": 50,
+    "y": 40,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 1122,
+    "h": 1402,
+    "kb": 2844
+   },
+   "card": {
+    "w": 672,
+    "h": 840,
+    "kb": 87.4,
+    "q": 76,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 384,
+    "h": 480,
+    "kb": 38.6,
+    "q": 80
+   },
+   "tiny": {
+    "w": 128,
+    "h": 160,
+    "kb": 4.9
+   },
+   "color": "#8b5129"
+  },
+  {
+   "key": "angelosmourad-1",
+   "person": "angelosmourad",
+   "name": "أبونا أنجيلوس مراد",
+   "cat": "ourchurch",
+   "class": "living",
+   "src": "03-الأحياء-صور-حقيقية/أبونا أنجيلوس مراد.jpg",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "ظبط الصورة (crop) ده اللي اتعمل في معاينة P3.",
+   "flags": [],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 7,
+    "z": 1.9
+   },
+   "cropAuto": false,
+   "orig": {
+    "w": 375,
+    "h": 929,
+    "kb": 105
+   },
+   "card": {
+    "w": 339,
+    "h": 840,
+    "kb": 12.9,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 194,
+    "h": 480,
+    "kb": 6.3,
+    "q": 84
+   },
+   "tiny": {
+    "w": 64,
+    "h": 160,
+    "kb": 1
+   },
+   "color": "#494649"
+  },
+  {
+   "key": "philopaterromany-1",
+   "person": "philopaterromany",
+   "name": "أبونا فيلوباتير روماني",
+   "cat": "ourchurch",
+   "class": "living",
+   "src": "03-الأحياء-صور-حقيقية/أبونا فيلوباتير روماني.jpeg",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 23,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 591,
+    "h": 1280,
+    "kb": 97
+   },
+   "card": {
+    "w": 388,
+    "h": 840,
+    "kb": 51,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 222,
+    "h": 480,
+    "kb": 22.1,
+    "q": 84
+   },
+   "tiny": {
+    "w": 74,
+    "h": 160,
+    "kb": 2.8
+   },
+   "color": "#ab9580"
+  },
+  {
+   "key": "ibrahimisravim-1",
+   "person": "ibrahimisravim",
+   "name": "القمص إبراهيم إسراڤيم",
+   "cat": "ourchurch",
+   "class": "living",
+   "src": "03-الأحياء-صور-حقيقية/القمص إبراهيم إسرافيم.png",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "",
+   "flags": [],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 33,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 640,
+    "h": 960,
+    "kb": 477
+   },
+   "card": {
+    "w": 560,
+    "h": 840,
+    "kb": 39.9,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 320,
+    "h": 480,
+    "kb": 20.3,
+    "q": 84
+   },
+   "tiny": {
+    "w": 107,
+    "h": 160,
+    "kb": 2.8
+   },
+   "color": "#bbb5a0"
+  },
+  {
+   "key": "isaacnabih-1",
+   "person": "isaacnabih",
+   "name": "القمص إسحاق نبيه",
+   "cat": "ourchurch",
+   "class": "living",
+   "src": "03-الأحياء-صور-حقيقية/أبونا إسحاق نبيه.jpg",
+   "type": "photo",
+   "main": false,
+   "stage": "",
+   "occasion": "",
+   "ask": "صغيرة (240×320).",
+   "flags": [],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 38,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 240,
+    "h": 320,
+    "kb": 15
+   },
+   "card": {
+    "w": 240,
+    "h": 320,
+    "kb": 14.1,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 240,
+    "h": 320,
+    "kb": 14.1,
+    "q": 84
+   },
+   "tiny": {
+    "w": 120,
+    "h": 160,
+    "kb": 3.5
+   },
+   "color": "#8e7e7d"
+  },
+  {
+   "key": "isaacnabih-2",
+   "person": "isaacnabih",
+   "name": "القمص إسحاق نبيه",
+   "cat": "ourchurch",
+   "class": "living",
+   "src": "03-الأحياء-صور-حقيقية/أبونا إسحاق نبيه2.jpg",
+   "type": "photo",
+   "main": true,
+   "stage": "",
+   "occasion": "",
+   "ask": "مقترحة أساسية: أكبر وأوضح من التانية.",
+   "flags": [],
+   "source": "فولدر صاحب المشروع (02 أو 03). المصدر الأصلي مش متسجل",
+   "terms": "غير معروفة. صاحب المشروع جابها",
+   "crop": {
+    "x": 50,
+    "y": 50,
+    "z": 1
+   },
+   "cropAuto": true,
+   "orig": {
+    "w": 526,
+    "h": 526,
+    "kb": 45
+   },
+   "card": {
+    "w": 526,
+    "h": 526,
+    "kb": 46,
+    "q": 84,
+    "smooth": false
+   },
+   "thumb": {
+    "w": 480,
+    "h": 480,
+    "kb": 34.4,
+    "q": 80
+   },
+   "tiny": {
+    "w": 160,
+    "h": 160,
+    "kb": 4.1
+   },
+   "color": "#404d35"
+  }
+ ]
+}
