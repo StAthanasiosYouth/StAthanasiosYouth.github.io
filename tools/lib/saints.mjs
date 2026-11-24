@@ -10,7 +10,7 @@
  *            automatic feasts or notifications, until a day with its source is added (and status/missing follow).
  *   feasts   [{ kind, coptic: 'M-D' | gregorian: 'MM-DD', year?, source, more?: [url], title?, note? }] — the yearly
  *            days. coptic = 1 توت … 13 النسيء, turned into a Gregorian date by code; gregorian = modern events.
- *   milestones? [{ kind, date: 'YYYY-MM-DD' | year: YYYY (until?), source, more?, status: confirmed|film|conflict|pending, note? }]
+ *   milestones? [{ kind, date: 'YYYY-MM-DD' | month: 'YYYY-MM' | year: YYYY (until?), source, more?, status: confirmed|film|conflict|pending, note? }]
  *            — one-time events of a life (for a timeline), never a yearly feast. source 'owner' (status pending) = told by
  *            the owner, not yet written anywhere.
  *   sources? [url] · pending? [{ field, need, checked: [url], note? }] — what is still to find (the Deep Research list).
@@ -103,7 +103,8 @@ export function check(reg, { root = ROOT, pictures = null } = {}) {
       for (const u of (m && m.more) || []) if (typeof u !== 'string' || !URL_RE.test(u)) e(`محطة «${m.kind}»: رابط زيادة مش https.`);
       if (!MILESTONE_STATUS.includes(m && m.status)) e(`محطة «${m && m.kind}»: status لازم ${MILESTONE_STATUS.join('/')}.`);
       if (m && m.date != null && !realDate(m.date)) e(`محطة «${m.kind}»: التاريخ «${m.date}» مش صح.`);
-      if (m && m.date != null && m.year != null) e(`محطة «${m.kind}»: date أو year، مش الاتنين.`);
+      if (m && m.month != null && !(/^\d{4}-(0[1-9]|1[0-2])$/.test(m.month))) e(`محطة «${m.kind}»: الشهر «${m.month}» مش صح (YYYY-MM).`);
+      if (m && [m.date, m.month, m.year].filter(x => x != null).length > 1) e(`محطة «${m.kind}»: date أو month أو year، واحد بس.`);
     }
     for (const u of p.sources || []) if (typeof u !== 'string' || !URL_RE.test(u)) e('sources: رابط مش https.');
     for (const q of p.pending || []) {

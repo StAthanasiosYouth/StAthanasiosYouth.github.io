@@ -76,9 +76,9 @@ test('registry: the owner decisions (names, dates) are in the file', () => {
   // St-Takla's page for our church: Fr Ibrahim priest 1988-02-21, hegumen 1990-04-30; Fr Isaac priest 1997-08-31
   assert.deepEqual(by('ibrahimisravim').feasts.map(day), ['1988-02-21', '1990-04-30']);
   assert.deepEqual(by('isaacnabih').feasts.map(day), ['1997-08-31']);
-  // hegumen 2019 (owner, year only): a pending milestone, not a feast, so no occasion until a full date with a source
+  // hegumen August 2019 (owner, month only): a pending milestone, not a feast, so no occasion until a full date with a source
   assert.equal(by('isaacnabih').name, 'القمص إسحاق نبيه');
-  assert.deepEqual(by('isaacnabih').milestones.map(m => [m.year, m.source, m.status, m.date]), [[2019, 'owner', 'pending', undefined]]);
+  assert.deepEqual(by('isaacnabih').milestones.map(m => [m.month, m.source, m.status, m.date, m.year]), [['2019-08', 'owner', 'pending', undefined, undefined]]);
   assert.equal(by('isaacnabih').status, 'complete');
   assert.deepEqual(toCoptic('1988-02-21'), { y: 1704, m: 6, d: 13 });
   assert.deepEqual(toCoptic('1990-04-30'), { y: 1706, m: 8, d: 22 });
@@ -150,7 +150,7 @@ test('registry: check() names each problem', () => {
       { id: 'a', name: 'ب', cat: 'nope', ...ok, feasts: [{ kind: 'k', gregorian: '02-30', source: 'http://x.org' }] },
       { id: 'c', name: 'ج', cat: 'martyrs', ...ok, feasts: [{ kind: 'k', coptic: '1-1', gregorian: '01-01', source: 'https://x.org' }], image: { file: 'assets/img/saints/none.webp', source: 'https://x.org', license: 'CC0' } },
       { id: 'd', name: 'د', cat: 'martyrs', class: 'saint', status: 'complete', missing: [], album: [{ src: 'x.png', type: 'drawing' }], feasts: [],
-        milestones: [{ kind: 'm', date: '1975-02-30', source: 'https://x.org', status: 'maybe' }, { kind: 'o', year: 2019, source: 'owner', status: 'confirmed' }] },
+        milestones: [{ kind: 'm', date: '1975-02-30', source: 'https://x.org', status: 'maybe' }, { kind: 'o', year: 2019, source: 'owner', status: 'confirmed' }, { kind: 'q', month: '2019-13', source: 'owner', status: 'pending' }, { kind: 'r', month: '2019-08', year: 2019, source: 'owner', status: 'pending' }] },
       { id: 'e', name: 'ه', cat: 'martyrs', class: 'living', status: 'incomplete', missing: ['feasts'], album: [], feasts: [{ kind: 'k', gregorian: '06-31', year: 2019, source: 'https://x.org' }] }
     ],
     occasions: [{ id: 'a', name: 'م', kind: 'k', gregorian: '06-14', source: 'https://x.org' }]
@@ -170,6 +170,8 @@ test('registry: check() names each problem', () => {
   assert.match(errs, /d: محطة «m»: status لازم/);
   assert.match(errs, /d: محطة «m»: التاريخ «1975-02-30»/);
   assert.match(errs, /d: محطة «o»: اللي من صاحب المشروع حالتها pending/);
+  assert.match(errs, /d: محطة «q»: الشهر «2019-13» مش صح/);
+  assert.match(errs, /d: محطة «r»: date أو month أو year، واحد بس/);
   assert.match(errs, /e: .*اليوم الميلادي «06-31»/);
   assert.match(errs, /e: missing لازم \[album\]/);
   assert.match(check({ schema: 1, people: [] })[0], /schema 2/);
