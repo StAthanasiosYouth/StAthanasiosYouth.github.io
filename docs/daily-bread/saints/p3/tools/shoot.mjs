@@ -1,5 +1,5 @@
 // P3: real screenshots of the prototype (docs/daily-bread/saints/p3/admin.html) at 1440 (desktop) and 390 (phone).
-//   node docs/daily-bread/tools/static.mjs 4341      (must be running)
+//   node docs/daily-bread/saints/p3/tools/serve.mjs 4342   (must be running; the owner pictures, read only)
 //   node docs/daily-bread/saints/p3/tools/shoot.mjs [name…] → docs/daily-bread/saints/p3/shots/<name>-d.png / -m.webp
 import { existsSync, mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -14,11 +14,19 @@ const req = createRequire(join(MOD, 'package.json'));
 const puppeteer = req('puppeteer-core');
 const sharp = req('sharp');
 const CHROME = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(existsSync);
-const BASE = 'http://localhost:4341/docs/daily-bread/saints/p3/admin.html';
+// P3_PICS=1: through tools/serve.mjs (4342) with the owner's pictures → shots-local/ (gitignored: the pictures stay off
+// the public repository until P4); otherwise through docs/daily-bread/tools/static.mjs (4341), letters only → shots/
+const PICS = process.env.P3_PICS === '1';
+const BASE = `http://localhost:${PICS ? 4342 : 4341}/docs/daily-bread/saints/p3/admin.html`;
+const OUT = PICS ? 'shots-local' : 'shots';
 
 export const SHOTS = [
-  ['01-people', '?s=people&dirty=1', 'الشخصيات: الأرقام، «بيانات ناقصة»، الفلاتر، القايمة'],
-  ['02-people-incomplete', '?s=people&f=incomplete', 'فلتر «بيانات ناقصة»'],
+  ['01-people', '?s=people&dirty=1&v=large&g=cat', 'الشخصيات: صور كبيرة، مجمّعين بالمجموعة'],
+  ['01a-people-large', '?s=people&v=large&g=cat#list', 'صور كبيرة: القايمة نفسها'],
+  ['01b-people-medium', '?s=people&v=medium&g=cat#list', 'صور متوسطة'],
+  ['01c-people-list', '?s=people&v=list&g=#list', 'قايمة'],
+  ['01d-people-details', '?s=people&v=details&g=#list', 'تفاصيل'],
+  ['02-people-incomplete', '?s=people&f=incomplete&v=large&g=#list', 'فلتر «بيانات ناقصة»'],
   ['03-person-theophilus', '?s=person&id=theophilus', 'الشخص: الأنبا ثاؤفيلس (أيام، محطات، ألبوم)'],
   ['04-person-day', '?s=person&id=mary&m=day&i=0', 'تعديل يوم: قبطي ← ميلادي على طول'],
   ['05-person-incomplete', '?s=person&id=isaacsyrian', 'شخص بياناته ناقصة: مار إسحق'],
@@ -34,7 +42,7 @@ export const SHOTS = [
 ];
 
 const only = process.argv.slice(2);
-mkdirSync(join(P3, 'shots'), { recursive: true });
+mkdirSync(join(P3, OUT), { recursive: true });
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: true });
 const problems = [];
 for (const [name, qs] of SHOTS) {
@@ -46,10 +54,12 @@ for (const [name, qs] of SHOTS) {
     await page.goto(BASE + qs, { waitUntil: 'networkidle0' });
     await page.waitForFunction(() => window.__ready, { timeout: 10000 });
     await page.addStyleTag({ content: '*, *::before, *::after { animation-duration: 0s !important; animation-delay: 0s !important; transition-duration: 0s !important; caret-color: transparent !important; }' });
+    if (qs.endsWith('#list')) await page.evaluate(() => { const v = document.querySelector('.sa-viewbar'); window.scrollTo(0, v.getBoundingClientRect().top + scrollY - 90); });
+    await page.evaluate(() => Promise.all([...document.images].filter(i => i.getBoundingClientRect().top < innerHeight * 2).map(i => i.complete ? 0 : new Promise(r => { i.onload = i.onerror = r; }))));
     await new Promise(r => setTimeout(r, 500));
     const wide = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
     if (wide) problems.push(`${name}-${suf}: side scroll`);
-    await sharp(await page.screenshot()).webp({ quality: 82 }).toFile(join(P3, 'shots', `${name}-${suf}.webp`));
+    await sharp(await page.screenshot()).webp({ quality: 82 }).toFile(join(P3, OUT, `${name}-${suf}.webp`));
     
     await page.close();
   }

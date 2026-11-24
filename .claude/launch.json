@@ -37,6 +37,15 @@
         "4341"
       ],
       "port": 4341
+    },
+    {
+      "name": "p3-preview",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "docs/daily-bread/saints/p3/tools/serve.mjs",
+        "4342"
+      ],
+      "port": 4342
     }
   ]
 }

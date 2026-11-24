@@ -27,6 +27,8 @@ const WD = ['الحد', 'الاتنين', 'التلات', 'الأربع', 'ال�
 const SHELL = await fetch('admin-shell.json').then(r => r.json());
 const REG = await fetch('../../../../daily-bread/saints/registry.json').then(r => r.json());
 const ICONS = SHELL.desktop.icons;
+/* the owner's pictures, read only through tools/serve.mjs (thumbnails); without it, letters */
+const PICS = await fetch('/__pic-status').then(r => r.ok ? r.json() : {}).then(j => !!j.pictures).catch(() => false);
 const ic = (n, cls) => { const s = ICONS[n] || ICONS.info; return cls ? `<span class="${cls}" aria-hidden="true">${s}</span>` : s; };
 
 for (const [k, v] of Object.entries(SHELL.desktop.htmlAttrs)) if (k !== 'class') html.setAttribute(k, v);
@@ -36,7 +38,10 @@ if (q.get('mode') === 'light') { html.dataset.mode = 'light'; html.dataset.theme
 const S = {
   s: q.get('s') || 'people', id: q.get('id') || '', m: q.get('m') || '', i: +(q.get('i') || 0),
   f: q.get('f') || '', cls: '', stat: q.get('f') === 'incomplete' ? 'incomplete' : '', photo: '', praise: '', cat: '', q: q.get('q') || '',
-  done: q.get('done') === '1'
+  done: q.get('done') === '1',
+  // the list's look, like a folder in Windows: كبيرة / متوسطة / قايمة / تفاصيل, grouped by المجموعة or not (kept on this device)
+  v: q.get('v') || localStorage.getItem('sa-view') || 'large',
+  g: q.get('g') != null ? q.get('g') : (localStorage.getItem('sa-group') ?? 'cat')
 };
 if (S.f === 'living' || S.f === 'reposed') S.cls = S.f;
 if (S.f === 'nophoto') S.photo = 'no';
@@ -116,7 +121,12 @@ const seg = (name, label, opts, val) => `<div class="seg p8-filter" role="radiog
 const field = (label, input, hint = '', cls = '') => `<label class="field ${cls}"><span class="field__label">${label}</span>${input}${hint ? `<span class="field__hint">${hint}</span>` : ''}</label>`;
 const input = (v, attrs = '') => `<input class="input" value="${esc(v)}" ${attrs}>`;
 const note = (icon, text) => `<p class="ba-note">${ic(icon)}<span>${text}</span></p>`;
-const face = (p, big = false) => `<span class="ycard__face${big ? ' sa-face--big' : ''}" aria-hidden="true"><span class="ycard__letter">${esc(p.name.replace(/^(القديس(ة)?|الشهيد(ة)?|البابا|الأنبا|القمص|القس|أبونا|مار|السيدة|رئيس الملائكة|الملاك)\s+/, '').trim().charAt(0))}</span><i class="ycard__dot ycard__dot--${p.status === 'incomplete' ? 'warn' : 'ok'}"></i></span>`;
+const TITLES = /^(القديس(ة)?|الشهيد(ة)?|البابا|الأنبا|القمص|القس|أبونا|مار|السيدة|رئيس الملائكة|الملاك|العظيم)\s+/;
+const letter = p => { let n = p.name.trim(); for (let k = 0; k < 3 && TITLES.test(n); k++) n = n.replace(TITLES, ''); return esc(n.charAt(0)); };
+const mainOf = p => (p.album || []).find(a => a.main) || (p.album || [])[0] || null;
+const picUrl = (src, w) => PICS && src ? `/__pic/${w}/${src.split('/').map(encodeURIComponent).join('/')}` : '';
+const picImg = (p, w, cls) => { const a = mainOf(p); const u = a && picUrl(a.src, w); return u ? `<img class="${cls}" src="${u}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ''; };
+const face = (p, big = false) => { const img = picImg(p, big ? 360 : 160, 'ycard__photo'); return `<span class="ycard__face${img ? ' has-photo' : ''}${big ? ' sa-face--big' : ''}" aria-hidden="true"><span class="ycard__letter">${letter(p)}</span>${img}<i class="ycard__dot ycard__dot--${p.status === 'incomplete' ? 'warn' : 'ok'}"></i></span>`; };
 
 /* the bar: what is saved and not published yet */
 function dirtyBar() {
@@ -137,6 +147,34 @@ function personRow(p) {
   const line = next ? `${ic('calendar', 'ycard__ic')}<span>الجاي: <b>${dayLabel(next.f)}</b>${next.f.coptic ? ` = ${gText(next.at)}` : ` ${AR(next.at.slice(0, 4))}`} · ${esc(next.f.kind)}</span>` : `${ic('alert', 'ycard__ic')}<span>من غير يوم تذكار: مش بيدخل الأعياد ولا الإشعارات</span>`;
   return `<article class="ycard sa-pcard" data-open="${p.id}"><button class="ycard__open" type="button" data-open="${p.id}" aria-label="افتح ${esc(p.name)}"></button>${face(p)}<div class="ycard__main"><bdi class="ycard__name">${esc(p.name)}</bdi><span class="ycard__chips">${p.class === 'living' ? chip('حي · مناسبات كنيستنا', 'gold') : ''}${chip(esc(REG.categories[p.cat] || p.cat), 'off')}${p.status === 'incomplete' ? chip('ناقص: ' + p.missing.map(m => MISS[m]).join('، '), 'warn') : ''}${days.length ? chip(days.length === 1 ? 'يوم واحد' : AR(days.length) + ' أيام', 'info') : ''}${p.praise ? chip('تمجيد', 'info') : ''}${p.album.length ? chip(AR(p.album.length) + ' صور', 'off') : ''}${changed.has(p.id) ? chip('مش منشور', 'warn') : ''}</span><span class="ycard__phone sa-next">${line}</span></div><span class="ycard__go" aria-hidden="true">${ic('chevron')}</span></article>`;
 }
+/* «كبيرة» / «متوسطة»: the picture first, the name on it (an arch, like the youth cards' face) */
+function personTile(p) {
+  const img = picImg(p, S.v === 'large' ? 360 : 160, 'sa-ptile__img');
+  const a = mainOf(p);
+  const sub = p.class === 'living' ? 'حي · مناسبات كنيستنا' : p.feasts.length ? (() => { const n = p.feasts.map(f => ({ f, at: nextOf(f) })).sort((x, y) => x.at < y.at ? -1 : 1)[0]; return `${dayLabel(n.f)} · ${esc(n.f.kind)}`; })() : 'من غير يوم تذكار';
+  return `<button class="sa-ptile${p.status === 'incomplete' ? ' is-incomplete' : ''}${p.class === 'living' ? ' is-living' : ''}" type="button" data-open="${p.id}" aria-label="افتح ${esc(p.name)}">
+    <span class="sa-ptile__frame${img ? ' has-photo' : ''}"><span class="sa-ptile__letter" aria-hidden="true">${letter(p)}</span>${img}
+      <span class="sa-ptile__badges">${p.status === 'incomplete' ? `<span class="sa-badge sa-badge--warn">ناقص: ${p.missing.map(m => MISS[m]).join('، ')}</span>` : ''}${p.class === 'living' ? '<span class="sa-badge sa-badge--gold">حي</span>' : ''}${changed.has(p.id) ? '<span class="sa-badge sa-badge--warn">مش منشور</span>' : ''}</span>
+      <span class="sa-ptile__name">${img && a && a.type === 'ai' ? '<i class="sa-ptile__ai">صورة تعبيرية</i>' : ''}<b>${esc(p.name)}</b>${S.v === 'large' ? `<small>${sub}</small>` : ''}</span></span></button>`;
+}
+/* «تفاصيل»: one row each, sortable columns in step B */
+function detailsTable(list) {
+  return `<div class="p8-tablewrap sa-tablewrap"><table class="p8-table sa-table"><thead><tr><th></th><th>الاسم</th><th>المجموعة</th><th>النوع</th><th>الأيام</th><th>الجاي</th><th>الصور</th><th>الحالة</th></tr></thead><tbody>${list.map(p => {
+    const n = p.feasts.length ? p.feasts.map(f => ({ f, at: nextOf(f) })).sort((x, y) => x.at < y.at ? -1 : 1)[0] : null;
+    return `<tr data-open="${p.id}"><td>${face(p)}</td><td><b>${esc(p.name)}</b></td><td>${esc(REG.categories[p.cat])}</td><td>${p.class === 'living' ? chip('حي', 'gold') : 'متنيح'}</td><td>${AR(p.feasts.length)}</td><td>${n ? `${dayLabel(n.f)}<small class="sa-muted"> ${gText(n.at)}</small>` : '—'}</td><td>${AR(p.album.length)}</td><td>${p.status === 'incomplete' ? chip('ناقص', 'warn') : chip('كاملة', 'ok')}${changed.has(p.id) ? chip('مش منشور', 'warn') : ''}</td></tr>`;
+  }).join('')}</tbody></table></div>`;
+}
+function listBody(list) {
+  if (!list.length) return `<div class="p8-empty empty-state"><span class="chipico" aria-hidden="true">${ic('users')}</span><b>مفيش حد بالفلتر ده.</b></div>`;
+  const draw = l => S.v === 'list' ? `<div class="comp-list ycards sa-list">${l.map(personRow).join('')}</div>` : S.v === 'details' ? detailsTable(l) : `<div class="sa-ptiles sa-ptiles--${S.v}">${l.map(personTile).join('')}</div>`;
+  if (S.g !== 'cat') return draw(list);
+  return Object.entries(REG.categories).map(([k, name]) => { const l = list.filter(p => p.cat === k); return l.length ? `<section class="sa-group"><h3 class="sa-group__head"><span>${name}</span><small>${AR(l.length)}</small></h3>${draw(l)}</section>` : ''; }).join('');
+}
+const VIEWS = [['large', 'grid', 'كبيرة'], ['medium', 'photos', 'متوسطة'], ['list', 'layers', 'قايمة'], ['details', 'sheet', 'تفاصيل']];
+function viewBar() {
+  return `<div class="sa-viewbar"><div class="seg p8-filter sa-views" role="radiogroup" aria-label="شكل العرض">${VIEWS.map(([v, i, t]) => `<label class="seg__opt"><input type="radio" name="view" value="${v}" ${S.v === v ? 'checked' : ''}><span>${ic(i, 'ico-sm')}${t}</span></label>`).join('')}</div>
+    <div class="seg p8-filter" role="radiogroup" aria-label="التجميع"><label class="seg__opt"><input type="radio" name="group" value="cat" ${S.g === 'cat' ? 'checked' : ''}><span>جمّع بالمجموعة</span></label><label class="seg__opt"><input type="radio" name="group" value="" ${S.g !== 'cat' ? 'checked' : ''}><span>كلهم مع بعض</span></label></div></div>`;
+}
 function viewPeople() {
   const inc = people.filter(p => p.status === 'incomplete');
   const n = { all: people.length, reposed: people.filter(p => p.class === 'reposed').length, living: people.filter(p => p.class === 'living').length, inc: inc.length };
@@ -153,7 +191,7 @@ function viewPeople() {
     ${seg('photo', 'الصور', [['', 'الصور: الكل'], ['yes', 'فيها صور'], ['no', 'من غير']], S.photo)}
     ${seg('praise', 'التمجيد', [['', 'التمجيد: الكل'], ['yes', 'فيه تمجيد'], ['no', 'من غير']], S.praise)}
     <select class="input sa-cat" aria-label="المجموعة" data-cat><option value="">كل المجموعات</option>${cats.map(([k, v]) => `<option value="${k}" ${S.cat === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>`;
-  const body = `${filters}<p class="sa-count">${list.length === people.length ? `${AR(list.length)} شخص، بترتيب السجل (اللي قبل بيكسب لو اتنين في نفس اليوم)` : `${AR(list.length)} من ${AR(people.length)}`}</p><div class="comp-list ycards sa-list">${list.length ? list.map(personRow).join('') : `<div class="p8-empty empty-state"><span class="chipico" aria-hidden="true">${ic('users')}</span><b>مفيش حد بالفلتر ده.</b></div>`}</div>`;
+  const body = `${filters}${viewBar()}<p class="sa-count">${list.length === people.length ? `${AR(list.length)} شخص، بترتيب السجل (اللي قبل بيكسب لو اتنين في نفس اليوم)` : `${AR(list.length)} من ${AR(people.length)}`}${PICS ? '' : ' · الصور بتظهر بعد P4'}</p>${listBody(list)}`;
   return dirtyBar() + kpis + miss + card('users', 'سجل الشخصيات', 'القديسين والمتنيحين والآباء. اضغط على أي حد تفتحه وتعدّل أيامه ومصادره وصوره', btn('شخص جديد', 'plus', 'btn--primary', 'data-act="new"'), body);
 }
 
@@ -169,7 +207,7 @@ function msRow(m, i) {
 }
 function albumTile(a, i, p) {
   const name = a.src.split('/').pop().replace(/\.\w+$/, '');
-  return `<div class="media-tile sa-tile${a.main ? ' is-main' : ''}"><span class="media-tile__frame sa-tile__frame">${ic('photos')}<small>مستني P4</small></span><span class="media-tile__name">${esc(name)}</span><span class="media-tile__meta">${a.type === 'ai' ? chip('صورة تعبيرية', 'gold') : chip('صورة حقيقية', 'info')}${a.main ? chip('الأساسية', 'ok') : ''}</span><span class="sa-tile__acts">${btn('', 'edit', 'btn--sm btn--ghost btn--icon', `data-m="photo" data-i="${i}" aria-label="عدّل الصورة"`)}${btn('', 'trash', 'btn--sm btn--ghost btn--icon', 'aria-label="شيل من الألبوم"')}</span></div>`;
+  return `<div class="media-tile sa-tile${a.main ? ' is-main' : ''}">${picUrl(a.src, 360) ? `<span class="media-tile__frame"><img class="media-tile__img" src="${picUrl(a.src, 360)}" alt="" loading="lazy" onerror="this.remove()"></span>` : `<span class="media-tile__frame sa-tile__frame">${ic('photos')}<small>مستني P4</small></span>`}<span class="media-tile__name">${esc(name)}</span><span class="media-tile__meta">${a.type === 'ai' ? chip('صورة تعبيرية', 'gold') : chip('صورة حقيقية', 'info')}${a.main ? chip('الأساسية', 'ok') : ''}</span><span class="sa-tile__acts">${btn('', 'edit', 'btn--sm btn--ghost btn--icon', `data-m="photo" data-i="${i}" aria-label="عدّل الصورة"`)}${btn('', 'trash', 'btn--sm btn--ghost btn--icon', 'aria-label="شيل من الألبوم"')}</span></div>`;
 }
 function viewPerson() {
   const p = byId(S.id) || people[0];
@@ -405,6 +443,8 @@ document.addEventListener('change', e => {
   if (r.closest('dialog')) return;
   if (r.name && ['cls', 'stat', 'photo', 'praise'].includes(r.name)) { S[r.name] = r.value; S.f = ''; render(true); }
   if (r.matches('[data-cat]')) { S.cat = r.value; render(true); }
+  if (r.name === 'view') { S.v = r.value; localStorage.setItem('sa-view', S.v); render(true); }
+  if (r.name === 'group') { S.g = r.value; localStorage.setItem('sa-group', S.g); render(true); }
 });
 let typing;
 document.addEventListener('input', e => {
