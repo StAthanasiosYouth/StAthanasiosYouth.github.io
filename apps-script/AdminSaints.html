@@ -160,10 +160,45 @@
   /* ---------- pictures: the media library (P4 fills the albums), each with its own crop ---------- */
   var CROP0 = { x: 50, y: 12, z: 1 };
   function cropOf(a) { var c = (a && a.crop) || {}; return { x: c.x != null ? c.x : CROP0.x, y: c.y != null ? c.y : CROP0.y, z: c.z || CROP0.z }; }
+  /* A crop is set in the crop tool's 3:4 frame. Other frames have other shapes (the list tile is wider: its name bar
+     sits in the same frame), and the same percentages there show another part of the picture (owner 2026-11-24:
+     «جوه مظبوطة وبرا لأ»). So each frame keeps the SAME point of the picture in its centre, at the same zoom:
+     the point is read from the 3:4 geometry, then placed for this frame's own shape (object-fit: cover, then
+     scale(z) around object-position, as below). */
+  var CROP_FRAME = 3 / 4;
+  function cropAxis(c, s, z) {
+    // the share of the picture this axis shows (s / z) and the picture point at the frame's centre
+    var v = s / z;
+    return v >= 1 ? null : { v: v, centre: c / 100 * (1 - v) + v / 2 };
+  }
+  function placeCrop(img, c) {
+    var w = img.naturalWidth, h = img.naturalHeight;
+    var box = img.getBoundingClientRect();
+    if (!w || !h || !box.width || !box.height) return { x: c.x, y: c.y };
+    var a = w / h;
+    var fit = function (F) { return a > F ? { sx: F / a, sy: 1 } : { sx: 1, sy: a / F }; };
+    var ref = fit(CROP_FRAME), here = fit(box.width / box.height);
+    var out = { x: c.x, y: c.y };
+    [['x', 'sx'], ['y', 'sy']].forEach(function (k) {
+      var from = cropAxis(c[k[0]], ref[k[1]], c.z);
+      var v = here[k[1]] / c.z;
+      if (v >= 1) { out[k[0]] = 50; return; }
+      var centre = from ? from.centre : 0.5;
+      out[k[0]] = Math.max(0, Math.min(100, (centre - v / 2) / (1 - v) * 100));
+    });
+    return out;
+  }
   function applyCrop(img, c) {
-    img.style.objectPosition = c.x + '% ' + c.y + '%';
-    img.style.transform = 'scale(' + c.z + ')';
-    img.style.transformOrigin = c.x + '% ' + c.y + '%';
+    var draw = function () {
+      var p = placeCrop(img, c);
+      img.style.objectPosition = p.x + '% ' + p.y + '%';
+      img.style.transform = 'scale(' + c.z + ')';
+      img.style.transformOrigin = p.x + '% ' + p.y + '%';
+    };
+    draw();
+    if (!img.complete || !img.naturalWidth) img.addEventListener('load', draw, { once: true });
+    // a frame drawn before it has a size (a list still being laid out): place it again once it has one
+    else if (!img.getBoundingClientRect().width) requestAnimationFrame(draw);
   }
   function mainOf(p) { var al = p.album || []; return al.filter(function (a) { return a.main; })[0] || al.filter(function (a) { return a.media; })[0] || null; }
   function mediaId(path) { return String(path || '').split('/').pop().replace(/\.\w+$/, ''); }
