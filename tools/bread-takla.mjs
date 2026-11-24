@@ -21,7 +21,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as T from './lib/takla.mjs';
 import { BOOKS, parseRef } from '../assets/js/bread/refs.js';
-import { loadForFeasts as loadSaints, feastsOfMonth } from './lib/saints.mjs';
+import { loadForFeasts as loadSaints, feastsOfMonth, pictureFor } from './lib/saints.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SITE = 'https://st-takla.org/';
@@ -168,10 +168,12 @@ export function sectionFor(sections, title) {
 export function feastEntry(hit, sec, katUrl) {
   const p = hit.person, f = hit.feast;
   const word = sec ? T.excerpt(sec.paras, FEAST_MAX) : (p.word || p.note || `النهارده ${f.kind} ${p.name}.`);
+  // P4: the album's picture for this day (media library), else the old St-Takla copy
+  const pic = pictureFor(p, f.kind, hit.date.slice(0, 4));
   return {
     date: hit.date, on: true, id: p.id, name: p.name, kind: f.kind, title: (sec ? sec.title : f.kind + ' ' + p.name).slice(0, 120),
     word, sourceUrl: sec ? katUrl : f.source,
-    img: p.image ? '/' + p.image.file : null, imgPage: p.image ? p.image.source : null,
+    img: pic ? pic.img : p.image ? '/' + p.image.file : null, imgAi: pic ? pic.ai : false, imgPage: !pic && p.image ? p.image.source : null,
     praise: p.praise ? p.praise.source : null, praiseTitle: p.praise ? p.praise.title || null : null, praiseText: p.praise ? p.praise.text : null,
     others: hit.others
   };

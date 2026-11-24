@@ -14,7 +14,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as S from '../../worker/src/bread/saints.js';
 
-export { CLASSES, MISSABLE, MILESTONE_STATUS, OWNER, ALBUM_TYPES, IMG_DIR, missingOf, withStatus, scheduled, isOn, feastsOfMonth, occasionsOfMonth, publicFile, checkPerson, checkOccasion } from '../../worker/src/bread/saints.js';
+export { CLASSES, MISSABLE, MILESTONE_STATUS, OWNER, ALBUM_TYPES, IMG_DIR, missingOf, withStatus, scheduled, isOn, feastsOfMonth, occasionsOfMonth, publicFile, pictureFor, labelOf, checkPerson, checkOccasion } from '../../worker/src/bread/saints.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const REGISTRY = path.join(ROOT, 'daily-bread', 'saints', 'registry.json');

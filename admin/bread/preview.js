@@ -27,6 +27,8 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&a
 // W7: the same as the member page (assets/js/bread/page.js): St-Takla's own links stay links, the source in small type
 const TAKLA = /^https:\/\/(www\.)?st-takla\.org\/[^\s<>"'()[\]]*$/;
 const SAINT_IMG = /^\/assets\/img\/saints\/[a-z0-9-]+\.(?:webp|jpg|png)$/;
+// P4: a saint's album picture from the media library (as assets/js/bread/model.js MEDIA_IMG)
+const MEDIA_IMG = /^\/media\/\d{4}\/[a-z]{3}-[a-z0-9]{8}\.(?:webp|jpg)$/;
 const medText = text => String(text || '').split(/\n\s*\n/).map(p => p.trim()).filter(Boolean).map(p => '<p>' + esc(p).replace(/\[([^\]\n]{1,200})\]\(([^)\s]{1,400})\)/g, (m, words, url) => {
   const raw = url.replace(/&amp;/g, '&');
   return TAKLA.test(raw) ? '<a href="' + esc(raw) + '" target="_blank" rel="noopener">' + words + '</a>' : words;
@@ -118,7 +120,8 @@ function page(day) {
 /* W7: the saint's card, as the member page draws it (assets/js/bread/page.js feast()) */
 function feastCard(f) {
   if (!f) return '';
-  const pic = f.img && (TAKLA.test(f.img) || SAINT_IMG.test(f.img)) ? `<figure class="br-feast__fig"><img class="br-feast__img" src="${esc(f.img)}" alt="" referrerpolicy="no-referrer"></figure>` : '';
+  const pic = f.img && (TAKLA.test(f.img) || SAINT_IMG.test(f.img) || MEDIA_IMG.test(f.img))
+    ? `<figure class="br-feast__fig"><span class="br-feast__pic"><img class="br-feast__img" src="${esc(f.img)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">${f.imgAi === true ? '<span class="br-feast__ai">صورة تعبيرية</span>' : ''}</span></figure>` : '';
   // the saint's praise from the registry, only with its source (as the member page)
   const lines = f.praise && f.praiseText ? f.praiseText.split('\n').map(l => l.trim()).filter(Boolean) : [];
   const praise = lines.length ? `<blockquote class="br-feast__praise"><p class="br-feast__praise-title">${esc(f.praiseTitle || 'من التمجيد')}</p><p class="br-feast__praise-text">${lines.map(esc).join('<br>')}</p><p class="br-med__by"><span class="br-src">التمجيد كامل</span></p></blockquote>` : '';

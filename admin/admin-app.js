@@ -29010,10 +29010,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var pub = published && published.published ? published.feasts : null;
     var list = (suggested || []).filter(keep).map(function (f) {
       var on = pub ? pub.some(function (p) { return p.date === f.date && p.name === f.name; }) : f.on !== false;
-      return { date: f.date, name: f.name, title: f.title || '', word: f.word, sourceUrl: f.sourceUrl || f.url, img: f.img || null, praise: f.praise || null, praiseTitle: f.praiseTitle || null, praiseText: f.praiseText || null, others: f.others || [], on: on };
+      return { date: f.date, name: f.name, title: f.title || '', word: f.word, sourceUrl: f.sourceUrl || f.url, img: f.img || null, imgAi: !!(f.img && f.imgAi), praise: f.praise || null, praiseTitle: f.praiseTitle || null, praiseText: f.praiseText || null, others: f.others || [], on: on };
     });
     (pub || []).forEach(function (p) {
-      if (!list.some(function (f) { return f.date === p.date && f.name === p.name; })) list.push({ date: p.date, name: p.name, title: p.title || '', word: p.word, sourceUrl: p.url, img: p.img || null, praise: p.praise || null, praiseTitle: p.praiseTitle || null, praiseText: p.praiseText || null, others: [], on: true });
+      if (!list.some(function (f) { return f.date === p.date && f.name === p.name; })) list.push({ date: p.date, name: p.name, title: p.title || '', word: p.word, sourceUrl: p.url, img: p.img || null, imgAi: !!(p.img && p.imgAi), praise: p.praise || null, praiseTitle: p.praiseTitle || null, praiseText: p.praiseText || null, others: [], on: true });
     });
     list.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
     var state = { list: list, published: null, loading: false, error: null };
@@ -29053,7 +29053,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       var box = el('input', { type: 'checkbox', checked: f.on ? true : null, onchange: function () { f.on = box.checked; A.render(); } });
       return el('div', { class: 'ba-feast' + (onPick && BR.feastPick === f.date ? ' is-on' : '') },
         el('label', { class: 'ba-feast__pick' }, box,
-          f.img ? el('img', { src: f.img, alt: '', width: '44', height: '44', loading: 'lazy', referrerpolicy: 'no-referrer' }) : null,
+          // P4: a media library picture → its small 480 copy in this list
+          f.img ? el('img', { src: /^\/media\/\d{4}\/[a-z]{3}-[a-z0-9]{8}\.(webp|jpg)$/.test(f.img) ? f.img.replace(/\.(webp|jpg)$/, '-480.$1') : f.img, alt: '', width: '44', height: '44', loading: 'lazy', referrerpolicy: 'no-referrer' }) : null,
           el('span', {}, el('b', { text: dateWord(f.date) + ' · ' + f.name }), el('small', { text: f.title || '' }),
             // the saints registry (owner 2026-11-19): the saint's praise, and who else is remembered that day
             el('small', { class: 'ba-feast__praise', text: f.praiseText ? '♫ ' + f.praiseText.split('\n')[0] : 'من غير تمجيد' }),
@@ -29069,7 +29070,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       el('div', { class: 'ba-actions' }, toggle, el('span', { class: 'sp' }),
         same ? tag(on.length ? 'اتنشرت ✓' : 'اتنشرت فاضية: مفيش عيد ظاهر', 'ok') : st.published !== null ? tag('فيه تعديل مش منشور', 'warn') : null,
         btn(label, 'check', 'btn--primary btn--sm', { 'data-act': 'bread-feasts', disabled: same || (st.published === null && !on.length), onclick: function (event) {
-          var body = { month: month, feasts: on.map(function (f) { return { date: f.date, name: f.name, title: f.title || undefined, word: f.word, url: f.sourceUrl, img: f.img || undefined, praise: f.praise || undefined, praiseTitle: f.praiseText ? f.praiseTitle || undefined : undefined, praiseText: f.praiseText || undefined }; }) };
+          var body = { month: month, feasts: on.map(function (f) { return { date: f.date, name: f.name, title: f.title || undefined, word: f.word, url: f.sourceUrl, img: f.img || undefined, imgAi: f.img && f.imgAi ? true : undefined, praise: f.praise || undefined, praiseTitle: f.praiseText ? f.praiseTitle || undefined : undefined, praiseText: f.praiseText || undefined }; }) };
           A.withBusy(event.currentTarget, api('POST', 'feasts', body).then(function () { st.published = key; A.toast('اتنشرت أعياد ' + monthName(month)); A.render(); })).catch(function (error) { A.fail(error); });
         } }))
     ]);
@@ -29096,7 +29097,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var list = st && st.list ? st.list : [];
     var chosen = list.filter(function (f) { return f.date === BR.feastPick; })[0] || list[0] || null;
     BR.feastPick = chosen ? chosen.date : null;
-    BR.previewDay = chosen ? { feastOnly: true, date: chosen.date, feast: { name: chosen.name, title: chosen.title, word: chosen.word, img: chosen.img, url: chosen.sourceUrl, praise: chosen.praise, praiseTitle: chosen.praiseTitle, praiseText: chosen.praiseText } } : null;
+    BR.previewDay = chosen ? { feastOnly: true, date: chosen.date, feast: { name: chosen.name, title: chosen.title, word: chosen.word, img: chosen.img, imgAi: !!chosen.imgAi, url: chosen.sourceUrl, praise: chosen.praise, praiseTitle: chosen.praiseTitle, praiseText: chosen.praiseText } } : null;
     var block = feastsBlock(month, function (f) { BR.feastPick = f.date; A.render(); });
     if (!chosen) { r.append(block); }
     else {
@@ -29518,7 +29519,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     if (!date) return null;
     var st = BR.feasts[date.slice(0, 7)];
     var f = st && st.list.filter(function (x) { return x.on && x.date === date; })[0];
-    return f ? { name: f.name, title: f.title, word: f.word, img: f.img, url: f.sourceUrl, praise: f.praise, praiseTitle: f.praiseTitle, praiseText: f.praiseText } : null;
+    return f ? { name: f.name, title: f.title, word: f.word, img: f.img, imgAi: !!f.imgAi, url: f.sourceUrl, praise: f.praise, praiseTitle: f.praiseTitle, praiseText: f.praiseText } : null;
   }
 
   function monthPlan() {
@@ -30207,7 +30208,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     return el('button', { class: 'sa-ptile' + (p.status === 'incomplete' ? ' is-incomplete' : '') + (p.class === 'living' ? ' is-living' : ''), type: 'button', 'data-saint': p.id, 'aria-label': 'افتح ' + p.name, onclick: function () { openPerson(p.id); } },
       el('span', { class: 'sa-ptile__frame' },
         el('span', { class: 'sa-ptile__pic' }, img ? el('span', { class: 'sa-whole' }, img) : el('span', { class: 'sa-ptile__letter', 'aria-hidden': 'true', text: letter(p) }),
-          img && a.type === 'ai' ? el('i', { class: 'sa-ptile__ai', text: 'صورة تعبيرية' }) : null),
+          img && (a.type === 'ai' || a.type === 'art') ? el('i', { class: 'sa-ptile__ai', text: 'صورة تعبيرية' }) : null),
         el('span', { class: 'sa-ptile__name' }, el('b', { text: p.name }), SA.view === 'large' ? el('small', { text: when }) : null)),
       el('span', { class: 'sa-ptile__status' },
         n ? el('span', { class: 'sa-left' + (daysTo(n.at) <= 7 ? ' is-soon' : '') }, el('span', { class: 'ico-sm', 'aria-hidden': 'true' }, icon('clock')), inWords(daysTo(n.at))) : null,
@@ -30413,7 +30414,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       return el('div', { class: 'media-tile sa-tile' + (a.main ? ' is-main' : '') },
         img ? el('span', { class: 'media-tile__frame' }, el('span', { class: 'sa-whole' }, img)) : el('span', { class: 'media-tile__frame sa-tile__frame' }, icon('photos'), el('small', { text: a.media ? '…' : 'مستني P4' })),
         el('span', { class: 'media-tile__name', text: a.caption || a.stage || String(a.src || a.media || '').split('/').pop().replace(/\.\w+$/, '') }),
-        el('span', { class: 'media-tile__meta' }, a.type === 'ai' ? chip('صورة تعبيرية', 'gold') : chip('صورة حقيقية', 'info'), a.main ? chip('الأساسية', 'ok') : null),
+        el('span', { class: 'media-tile__meta' }, a.type === 'ai' ? chip('صورة تعبيرية', 'gold') : a.type === 'art' ? chip('رسم · صورة تعبيرية', 'gold') : chip('صورة حقيقية', 'info'), a.main ? chip('الأساسية', 'ok') : null),
         el('span', { class: 'sa-tile__acts' },
           el('button', { class: 'btn btn--sm btn--ghost btn--icon', type: 'button', 'aria-label': 'عدّل الصورة', 'data-act': 'saints-photo', onclick: function () { photoModal(i); } }, icon('edit')),
           el('button', { class: 'btn btn--sm btn--ghost btn--icon', type: 'button', 'aria-label': 'شيل من الألبوم', onclick: function () {
@@ -30643,7 +30644,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var body = el('div', { class: 'ba-dayform' },
       a.src && !a.media ? el('p', { class: 'sa-file' }, icon('photos'), el('bdi', { text: String(a.src).split('/').pop() })) : null,
       el('div', { class: 'field sa-cropfield' }, el('span', { class: 'field__label', text: 'ظبط الصورة' }), crop.node, el('span', { class: 'field__hint', text: 'زي الصورة الشخصية: اسحب وكبّر لحد ما الوش يبان كويس ومش مقصوص' })),
-      field('النوع', seg('النوع', [['ai', 'صورة تعبيرية (AI)'], ['photo', 'صورة حقيقية']], type, function (v) { type = v; }), 'التعبيرية بيتكتب عليها «صورة تعبيرية» صغيرة على الموقع'),
+      field('النوع', seg('النوع', [['ai', 'صورة تعبيرية (AI)'], ['art', 'رسم / أيقونة'], ['photo', 'صورة حقيقية']], type, function (v) { type = v; }), 'التعبيرية والرسم بيتكتب عليهم «صورة تعبيرية» صغيرة على الموقع'),
       el('div', { class: 'ba-dayform__two' }, field('المرحلة', stage), field('المناسبة', occ)),
       el('label', { class: 'sa-check' }, main, el('span', { text: 'الصورة الأساسية (بتظهر لو مفيش صورة للمرحلة أو المناسبة)' })),
       field('وصف', caption), field('مصدر الصورة', credit));

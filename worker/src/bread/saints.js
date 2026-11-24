@@ -10,7 +10,9 @@
  *   feasts   [{ kind, coptic: 'M-D' | gregorian: 'MM-DD', year?, source, more?: [url], title?, note? }] — yearly days
  *   milestones? [{ kind, date | month | year (until?), source | 'owner', status: confirmed|film|conflict|pending, note? }]
  *   sources? [url] · pending? [{ field, need, checked: [url], note? }] · praise? { text, source, title? } · word?
- *   album    [{ src?, media?, type: 'ai' | 'photo', main?, stage?, occasion?, caption?, credit?, crop?: { x, y, z } }]
+ *   album    [{ src?, media?, type: 'ai' | 'photo' | 'art', main?, stage?, occasion?, caption?, credit?, crop?: { x, y, z } }]
+ *            type (P4, owner 2026-11-24): ai = AI illustration, photo = a real photograph, art = a painted / drawn portrait
+ *            or icon (not AI, not a photograph). ai and art show «صورة تعبيرية» on the site (labelOf).
  *            src = the owner's picture file (P2, internal); media = the site's media library path (P4); crop (P3, owner
  *            2026-11-24): the point kept in view (% of the picture) and the zoom (1–3) for the admin's small frames.
  * Top level `occasions`: church days that are not a person: { id, name, kind?, coptic | gregorian, year?, repeat?:
@@ -22,7 +24,9 @@ export const CLASSES = ['reposed', 'living'];
 export const MISSABLE = ['feasts', 'album'];
 export const MILESTONE_STATUS = ['confirmed', 'film', 'conflict', 'pending'];
 export const OWNER = 'owner';
-export const ALBUM_TYPES = ['ai', 'photo'];
+export const ALBUM_TYPES = ['ai', 'photo', 'art'];
+// the media library's own picture path (P4): the card copy, and the small 480 copy beside it
+export const SITE_MEDIA_IMG = /^\/media\/\d{4}\/[a-z]{3}-[a-z0-9]{8}\.(?:webp|jpg)$/;
 export const IMG_DIR = 'assets/img/saints/';
 export const ID_RE = /^[a-z0-9]+$/;
 export const LIMITS = { name: 120, kind: 120, title: 200, note: 1500, need: 400, praise: 1500, word: 2000, stage: 80, caption: 200, src: 300, album: 40, feasts: 12, milestones: 40, sources: 20, more: 10 };
@@ -84,7 +88,7 @@ function checkAlbumItem(a, e, opts) {
   if (!hasSrc && !hasMedia) e('album: الصورة لازم ليها ملف (src) أو صورة من المكتبة (media).');
   if (hasSrc && (typeof a.src !== 'string' || !a.src.trim() || a.src.includes('..') || a.src.length > LIMITS.src)) e('album: src فاضي أو غلط.');
   if (hasMedia && (typeof a.media !== 'string' || !MEDIA_RE.test(a.media))) e('album: الصورة لازم من مكتبة الصور (media/YYYY/…).');
-  if (!ALBUM_TYPES.includes(a.type)) e(`album: النوع «${a.type}» لازم ai أو photo.`);
+  if (!ALBUM_TYPES.includes(a.type)) e(`album: النوع «${a.type}» لازم ai أو photo أو art.`);
   if (a.main != null && typeof a.main !== 'boolean') e('album: «الأساسية» لازم آه أو لأ.');
   if (!optText(a.stage, LIMITS.stage) || !optText(a.occasion, LIMITS.kind) || !optText(a.caption, LIMITS.caption) || !optText(a.credit, LIMITS.caption)) e('album: المرحلة أو المناسبة أو الوصف طويل.');
   if (a.crop != null) {
@@ -202,6 +206,21 @@ export function feastsOfMonth(reg, ym) {
     if (hits.length) out.push({ date: day.date, coptic: { m: day.m, d: day.d }, person: hits[0].person, feast: hits[0].feast, others: hits.slice(1).map(h => h.person.name) });
   }
   return out;
+}
+
+/*
+ * P4: the picture of a person's day on the card — { img: '/media/…', ai } | null (then the person's old `image`, if any).
+ * The owner's rule (P3 approval, 2026-11-24): the pictures of THIS occasion (feast kind) first, else the main one, else
+ * the first; several for the same occasion take turns, one a year. ai = «صورة تعبيرية» (AI or painted, labelOf).
+ */
+export const labelOf = a => !!a && (a.type === 'ai' || a.type === 'art');
+export function pictureFor(p, kind, year) {
+  const al = (p && Array.isArray(p.album) ? p.album : []).filter(a => a && a.media);
+  if (!al.length) return null;
+  const same = al.filter(a => kind && a.occasion === kind);
+  const pool = same.length ? same : [al.find(a => a.main) || al[0]];
+  const a = pool[((Number(year) || 0) % pool.length + pool.length) % pool.length];
+  return { img: '/' + a.media, ai: labelOf(a) };
 }
 
 /* «مناسبات كنيستنا» of a Gregorian month (P5/P6): living fathers' days and the church's own days, in date order */

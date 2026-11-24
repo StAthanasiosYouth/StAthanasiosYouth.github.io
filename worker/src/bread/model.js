@@ -188,6 +188,8 @@ export const FEAST_LIMITS = { name: 120, title: 160, word: 2000, url: 400, prais
 // a picture is St-Takla's or our own copy under /assets/img/saints/
 export const HTTPS_URL = /^https:\/\/[^\s<>"'()\[\]]+$/;
 export const SAINT_IMG = /^\/assets\/img\/saints\/[a-z0-9-]+\.(?:webp|jpg|png)$/;
+// P4: a saint's album picture from the media library (the card copy); imgAi = «صورة تعبيرية» on it (AI or painted)
+export const MEDIA_IMG = /^\/media\/\d{4}\/[a-z]{3}-[a-z0-9]{8}\.(?:webp|jpg)$/;
 export function checkFeasts(body) {
   const errors = [];
   const month = body && body.month;
@@ -207,9 +209,10 @@ export function checkFeasts(body) {
     const praiseTitle = str(f.praiseTitle, FEAST_LIMITS.praiseTitle, { optional: true }), praiseText = str(f.praiseText, FEAST_LIMITS.praiseText, { optional: true });
     if (!name.ok || !word.ok) { err('الاسم أو الكلمة فاضيين أو طوال.'); continue; }
     if (!url.ok || !HTTPS_URL.test(url.value)) { err('رابط المصدر لازم صفحة https.'); continue; }
-    if (!img.ok || (img.value && !TAKLA_URL.test(img.value) && !SAINT_IMG.test(img.value))) { err('الصورة لازم من st-takla.org أو من صور القديسين في الموقع.'); continue; }
+    if (!img.ok || (img.value && !TAKLA_URL.test(img.value) && !SAINT_IMG.test(img.value) && !MEDIA_IMG.test(img.value))) { err('الصورة لازم من st-takla.org أو من صور القديسين في الموقع أو من مكتبة الصور.'); continue; }
+    if (f.imgAi != null && typeof f.imgAi !== 'boolean') { err('«صورة تعبيرية» لازم آه أو لأ.'); continue; }
     if (!praise.ok || (praise.value && !HTTPS_URL.test(praise.value)) || !praiseTitle.ok || !praiseText.ok || (praiseText.value && !praise.value)) { err('التمجيد: النص لازم يكون معاه رابط مصدره.'); continue; }
-    out.push({ date, name: name.value, title: title.ok ? title.value : null, word: word.value, url: url.value, img: img.value || undefined, praise: praise.value || undefined, praiseTitle: praiseTitle.value || undefined, praiseText: praiseText.value || undefined });
+    out.push({ date, name: name.value, title: title.ok ? title.value : null, word: word.value, url: url.value, img: img.value || undefined, imgAi: img.value && f.imgAi === true ? true : undefined, praise: praise.value || undefined, praiseTitle: praiseTitle.value || undefined, praiseText: praiseText.value || undefined });
   }
   if (errors.length) return { ok: false, errors };
   out.sort((a, b) => (a.date < b.date ? -1 : 1));

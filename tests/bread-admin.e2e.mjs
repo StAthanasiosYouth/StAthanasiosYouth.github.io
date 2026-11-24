@@ -767,6 +767,7 @@ test('W7 round 4: «علّم الكل / شيل الكل», a saint\'s card alone
   await sleep(800);
   assert.equal(await inFrame(() => document.querySelector('.br-feast__name') && document.querySelector('.br-feast__name').textContent), 'النهارده تذكار قديس النهارده');
   assert.equal(await inFrame(() => !!document.querySelector('.br-title')), false, 'alone: no topic');
+  assert.equal(await inFrame(() => !!document.querySelector('.br-feast__ai')), false, 'no picture: no «صورة تعبيرية»');
   // the St-Takla review of the current month: the date first, the feast under today's topic, nothing sideways
   await go(d.page, 'breadnew');
   await d.page.click(`[data-act="bread-takla-month"][data-month="${now}"]`);
@@ -778,6 +779,33 @@ test('W7 round 4: «علّم الكل / شيل الكل», a saint\'s card alone
   await sleep(1200);
   const v = await inFrame(() => ({ feast: !!document.querySelector('.br-feast'), wide: document.documentElement.scrollWidth - document.documentElement.clientWidth }));
   assert.deepEqual(v, { feast: true, wide: 0 });
+  assert.deepEqual(d.problems, []);
+  await d.context.close();
+});
+
+test('P4: a saint\'s album picture (media library) on the card in the phone, «صورة تعبيرية» on an AI picture, the small copy in the list', async () => {
+  freshWorker({ empty: true });
+  const now = monthOf(TODAY, 0);
+  const file = taklaFile(now);
+  // a real library file of this repo (media/2026), so the picture really loads in the preview
+  file.feasts = [{ date: TODAY, on: true, name: 'قديس النهارده', title: 'تذكار', word: 'كلمة عنه.', sourceUrl: 'https://st-takla.org/k.html', img: '/media/2026/img-09d4476b.webp', imgAi: true }];
+  fake.state.suggest = { [now]: file };
+  const d = await open();
+  await go(d.page, 'breadfeasts');
+  await d.page.waitForSelector('.ba-feast img', { timeout: 8000 });
+  assert.equal(await d.page.$eval('.ba-feast img', i => i.getAttribute('src')), '/media/2026/img-09d4476b-480.webp', 'the list: the small copy');
+  const inFrame = async fn => { const h = await d.page.$('.ba-phone iframe'); const f = await h.contentFrame(); await f.waitForSelector('#app *', { timeout: 8000 }); return f.evaluate(fn); };
+  await d.page.waitForSelector('.ba-phone iframe');
+  await sleep(800);
+  const card = await inFrame(async () => {
+    const img = document.querySelector('.br-feast__img');
+    if (img && !img.complete) await new Promise(r => { img.onload = img.onerror = r; });
+    const label = document.querySelector('.br-feast__pic .br-feast__ai');
+    const a = img && img.getBoundingClientRect(), b = label && label.getBoundingClientRect();
+    return { src: img && img.getAttribute('src'), lazy: img && img.loading, loaded: !!(img && img.naturalWidth), label: label && label.textContent,
+      inside: !!(a && b && b.left >= a.left - 1 && b.right <= a.right + 1 && b.bottom <= a.bottom + 1), pictures: document.querySelectorAll('.br-feast img').length };
+  });
+  assert.deepEqual(card, { src: '/media/2026/img-09d4476b.webp', lazy: 'lazy', loaded: true, label: 'صورة تعبيرية', inside: true, pictures: 1 });
   assert.deepEqual(d.problems, []);
   await d.context.close();
 });

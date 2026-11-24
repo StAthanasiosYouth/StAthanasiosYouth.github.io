@@ -312,7 +312,7 @@
     return el('button', { class: 'sa-ptile' + (p.status === 'incomplete' ? ' is-incomplete' : '') + (p.class === 'living' ? ' is-living' : ''), type: 'button', 'data-saint': p.id, 'aria-label': 'افتح ' + p.name, onclick: function () { openPerson(p.id); } },
       el('span', { class: 'sa-ptile__frame' },
         el('span', { class: 'sa-ptile__pic' }, img ? el('span', { class: 'sa-whole' }, img) : el('span', { class: 'sa-ptile__letter', 'aria-hidden': 'true', text: letter(p) }),
-          img && a.type === 'ai' ? el('i', { class: 'sa-ptile__ai', text: 'صورة تعبيرية' }) : null),
+          img && (a.type === 'ai' || a.type === 'art') ? el('i', { class: 'sa-ptile__ai', text: 'صورة تعبيرية' }) : null),
         el('span', { class: 'sa-ptile__name' }, el('b', { text: p.name }), SA.view === 'large' ? el('small', { text: when }) : null)),
       el('span', { class: 'sa-ptile__status' },
         n ? el('span', { class: 'sa-left' + (daysTo(n.at) <= 7 ? ' is-soon' : '') }, el('span', { class: 'ico-sm', 'aria-hidden': 'true' }, icon('clock')), inWords(daysTo(n.at))) : null,
@@ -518,7 +518,7 @@
       return el('div', { class: 'media-tile sa-tile' + (a.main ? ' is-main' : '') },
         img ? el('span', { class: 'media-tile__frame' }, el('span', { class: 'sa-whole' }, img)) : el('span', { class: 'media-tile__frame sa-tile__frame' }, icon('photos'), el('small', { text: a.media ? '…' : 'مستني P4' })),
         el('span', { class: 'media-tile__name', text: a.caption || a.stage || String(a.src || a.media || '').split('/').pop().replace(/\.\w+$/, '') }),
-        el('span', { class: 'media-tile__meta' }, a.type === 'ai' ? chip('صورة تعبيرية', 'gold') : chip('صورة حقيقية', 'info'), a.main ? chip('الأساسية', 'ok') : null),
+        el('span', { class: 'media-tile__meta' }, a.type === 'ai' ? chip('صورة تعبيرية', 'gold') : a.type === 'art' ? chip('رسم · صورة تعبيرية', 'gold') : chip('صورة حقيقية', 'info'), a.main ? chip('الأساسية', 'ok') : null),
         el('span', { class: 'sa-tile__acts' },
           el('button', { class: 'btn btn--sm btn--ghost btn--icon', type: 'button', 'aria-label': 'عدّل الصورة', 'data-act': 'saints-photo', onclick: function () { photoModal(i); } }, icon('edit')),
           el('button', { class: 'btn btn--sm btn--ghost btn--icon', type: 'button', 'aria-label': 'شيل من الألبوم', onclick: function () {
@@ -748,7 +748,7 @@
     var body = el('div', { class: 'ba-dayform' },
       a.src && !a.media ? el('p', { class: 'sa-file' }, icon('photos'), el('bdi', { text: String(a.src).split('/').pop() })) : null,
       el('div', { class: 'field sa-cropfield' }, el('span', { class: 'field__label', text: 'ظبط الصورة' }), crop.node, el('span', { class: 'field__hint', text: 'زي الصورة الشخصية: اسحب وكبّر لحد ما الوش يبان كويس ومش مقصوص' })),
-      field('النوع', seg('النوع', [['ai', 'صورة تعبيرية (AI)'], ['photo', 'صورة حقيقية']], type, function (v) { type = v; }), 'التعبيرية بيتكتب عليها «صورة تعبيرية» صغيرة على الموقع'),
+      field('النوع', seg('النوع', [['ai', 'صورة تعبيرية (AI)'], ['art', 'رسم / أيقونة'], ['photo', 'صورة حقيقية']], type, function (v) { type = v; }), 'التعبيرية والرسم بيتكتب عليهم «صورة تعبيرية» صغيرة على الموقع'),
       el('div', { class: 'ba-dayform__two' }, field('المرحلة', stage), field('المناسبة', occ)),
       el('label', { class: 'sa-check' }, main, el('span', { text: 'الصورة الأساسية (بتظهر لو مفيش صورة للمرحلة أو المناسبة)' })),
       field('وصف', caption), field('مصدر الصورة', credit));

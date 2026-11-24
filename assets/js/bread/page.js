@@ -178,7 +178,8 @@ function meditation() {
 function feast() {
   const f = S.feast;
   if (!f) return '';
-  const pic = f.img ? `<figure class="br-feast__fig"><img class="br-feast__img" src="${esc(f.img)}" alt="${esc(f.name)}" loading="lazy" decoding="async" referrerpolicy="no-referrer"></figure>` : '';
+  // one picture, lazy; an AI or painted one carries a small «صورة تعبيرية» (P4, owner 2026-11-24). Never a photographer's name.
+  const pic = f.img ? `<figure class="br-feast__fig"><span class="br-feast__pic"><img class="br-feast__img" src="${esc(f.img)}" alt="${esc(f.name)}" loading="lazy" decoding="async" referrerpolicy="no-referrer">${f.imgAi ? '<span class="br-feast__ai">صورة تعبيرية</span>' : ''}</span></figure>` : '';
   // the saint's own praise (tamgeed / madih) from the registry, always with its source (owner, 2026-11-19)
   const lines = f.praiseText ? f.praiseText.split('\n').map(l => l.trim()).filter(Boolean) : [];
   const praise = lines.length

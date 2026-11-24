@@ -90,7 +90,7 @@ for (const p of reg.people) {
     rows.push({
       key, person: p.id, name: p.name, cat: p.cat, class: p.class, src: a.src,
       type: pl.type || a.type, main: pl.main != null ? pl.main : album.length === 1,
-      stage: pl.stage || '', occasion: pl.occasion || '', ask: pl.ask || '', flags: pl.flags || [],
+      stage: pl.stage || '', occasion: pl.occasion || '', caption: pl.caption || '', ask: pl.ask || '', flags: pl.flags || [],
       source: pl.source || plan.defaults[pl.type || a.type].source, terms: pl.terms || plan.defaults[pl.type || a.type].terms,
       crop, cropAuto: !pl.crop,
       orig: { w: meta.width, h: meta.height, kb: Math.round(input.length / 1024) },

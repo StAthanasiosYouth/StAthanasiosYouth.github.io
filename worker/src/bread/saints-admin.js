@@ -26,7 +26,7 @@ import { retry } from '../lib/db.js';
 import { sha256 } from '../lib/hash.js';
 import { limit } from '../lib/ratelimit.js';
 import { activityStmt } from '../lib/activity.js';
-import { checkPerson, checkOccasion, check, withStatus, scheduled, feastsOfMonth, publicFile, ID_RE } from './saints.js';
+import { checkPerson, checkOccasion, check, withStatus, scheduled, feastsOfMonth, publicFile, pictureFor, ID_RE } from './saints.js';
 import { fileStmts, mirrorSoon } from './store.js';
 
 export const SAINTS_ITEM_MAX_BYTES = 32 * 1024;
@@ -308,10 +308,12 @@ export async function adminSaintsFeasts(ctx) {
   const reg = JSON.parse(row.body);
   const feasts = feastsOfMonth(reg, month).map(hit => {
     const p = hit.person, f = hit.feast;
+    // P4: the album's picture for this day (pictureFor), else the old St-Takla copy
+    const pic = pictureFor(p, f.kind, hit.date.slice(0, 4));
     return {
       date: hit.date, on: true, id: p.id, name: p.name, kind: f.kind, title: (f.title || (f.kind + ' ' + p.name)).slice(0, 120),
       word: p.word || `النهارده ${f.kind} ${p.name}.`, sourceUrl: f.source,
-      img: p.image ? '/' + p.image.file : null,
+      img: pic ? pic.img : p.image ? '/' + p.image.file : null, imgAi: pic ? pic.ai : false,
       praise: p.praise ? p.praise.source : null, praiseTitle: p.praise ? p.praise.title || null : null, praiseText: p.praise ? p.praise.text : null,
       others: hit.others
     };

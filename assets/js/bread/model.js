@@ -112,6 +112,8 @@ export const TAKLA_URL = /^https:\/\/(www\.)?st-takla\.org\/[^\s<>"'()[\]]*$/;
 // the saints registry: a feast's source may be any https page; a picture is St-Takla's or our own copy
 export const HTTPS_URL = /^https:\/\/[^\s<>"'()[\]]+$/;
 export const SAINT_IMG = /^\/assets\/img\/saints\/[a-z0-9-]+\.(?:webp|jpg|png)$/;
+// P4: a saint's album picture from the media library (the card copy, ~60–90 KB)
+export const MEDIA_IMG = /^\/media\/\d{4}\/[a-z]{3}-[a-z0-9]{8}\.(?:webp|jpg)$/;
 
 /*
  * W7: the month's feasts file (daily-bread/data/feasts/YYYY-MM.json) → today's feast { name, title, word, url, img } | null.
@@ -127,7 +129,9 @@ export function feastOn(file, day) {
     praiseTitle: s(f.praiseTitle, 120), praiseText: s(f.praiseText, 1500)
   };
   if (!out.name || !HTTPS_URL.test(out.url)) return null;
-  if (out.img && !TAKLA_URL.test(out.img) && !SAINT_IMG.test(out.img)) out.img = '';
+  if (out.img && !TAKLA_URL.test(out.img) && !SAINT_IMG.test(out.img) && !MEDIA_IMG.test(out.img)) out.img = '';
+  // P4: «صورة تعبيرية» on an AI or painted picture (the file's imgAi, set from the album's type)
+  out.imgAi = !!out.img && f.imgAi === true;
   if (out.praise && !HTTPS_URL.test(out.praise)) out.praise = '';
   if (!out.praise) out.praiseText = out.praiseTitle = ''; // a praise is shown only with its source
   return out;
