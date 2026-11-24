@@ -30177,11 +30177,27 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           // the owner's file names (src) stay as they were, beside the library picture of the same order
           var old = it.data.album || [];
           album.forEach(function (a, i) { if (!plan.filter(function (x) { return x.person === id; })[i].fresh && old[i] && old[i].src && !old[i].media) a.src = old[i].src; });
-          if (JSON.stringify(old) === JSON.stringify(album)) return;
-          return api('POST', 'item', { kind: 'person', rev: it.rev, item: Object.assign({}, it.data, { album: album }) }).then(function () {
+          // filled already (this run or an earlier one): the same library pictures in the same order
+          var mediaOf = function (al) { return (al || []).map(function (a) { return a.media || ''; }).join('|'); };
+          var want = mediaOf(album);
+          var step = function () {
             saved++; SA.imp.step = 'بيملا الألبومات: ' + ar(saved) + ' من ' + ar(ids.length);
             var s = document.querySelector('[data-imp-step]'); if (s) s.textContent = SA.imp.step;
-          });
+          };
+          if (mediaOf(old) === want) { step(); return; }
+          // a save can land while its answer is lost (the free plan's CPU limit): the retry then meets a newer rev.
+          // So after a failure: read the person again; filled → done, else save again with the new rev (up to 10 times).
+          var trySave = function (n, rev, data) {
+            return api('POST', 'item', { kind: 'person', rev: rev, item: Object.assign({}, data, { album: album }) }).then(step, function (error) {
+              if (n >= 10 || (error && error.code === 'invalid')) throw error;
+              return new Promise(function (r) { setTimeout(r, 1500 + n * 500); }).then(function () { return load(true); }).then(function () {
+                var now = itemOf('person', id);
+                if (now && mediaOf(now.data.album) === want) { step(); return; }
+                return trySave(n + 1, now ? now.rev : rev, now ? now.data : data);
+              });
+            });
+          };
+          return trySave(1, it.rev, it.data);
         });
       });
       return c2;
