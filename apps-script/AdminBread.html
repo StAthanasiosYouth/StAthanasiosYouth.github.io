@@ -925,7 +925,8 @@
    * publish until something changes. The member page shows each on its own Cairo date, whatever the program.
    */
   BR.feasts = {};
-  var feastKey = function (list) { return JSON.stringify(list.filter(function (f) { return f.on; }).map(function (f) { return f.date + '|' + f.name; })); };
+  // P4: the picture is part of what is published (a new album picture → «انشر التعديل»)
+  var feastKey = function (list) { return JSON.stringify(list.filter(function (f) { return f.on; }).map(function (f) { return f.date + '|' + f.name + '|' + (f.img || '') + '|' + (f.imgAi ? 1 : 0); })); };
 
   function feastsFrom(month, suggested, published) {
     var today = cairoToday();
@@ -940,7 +941,8 @@
     });
     list.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
     var state = { list: list, published: null, loading: false, error: null };
-    if (pub) state.published = feastKey(list);
+    // what the published file itself holds (its pictures too), so a newer album picture shows as a change to publish
+    if (pub) state.published = feastKey(pub.filter(keep).map(function (p) { return { date: p.date, name: p.name, img: p.img || null, imgAi: !!(p.img && p.imgAi), on: true }; }).sort(function (a, b) { return a.date < b.date ? -1 : 1; }));
     return state;
   }
 
@@ -955,7 +957,12 @@
     Promise.all([sug, api('GET', 'feasts?month=' + month), reg]).then(function (both) {
       var list = both[0] && both[0].ready ? both[0].feasts.slice() : [];
       // St-Takla's suggestion keeps its day (the synaxarium's word); the registry adds the days it does not have
-      if (both[2] && both[2].ready) both[2].feasts.forEach(function (f) { if (!list.some(function (x) { return x.date === f.date; })) list.push(f); });
+      if (both[2] && both[2].ready) both[2].feasts.forEach(function (f) {
+        var same = list.filter(function (x) { return x.date === f.date; })[0];
+        if (!same) { list.push(f); return; }
+        // P4: the same person that day → the album's picture (and its «صورة تعبيرية») over the suggestion's older copy
+        if (f.img && (same.id ? same.id === f.id : same.name === f.name)) { same.img = f.img; same.imgAi = !!f.imgAi; }
+      });
       BR.feasts[month] = feastsFrom(month, list, both[1]);
       A.render();
     }).catch(function (error) {
