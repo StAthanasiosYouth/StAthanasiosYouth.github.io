@@ -162,14 +162,14 @@
 }
 
 /* ---------- the dawn look (light) ---------- */
-html[data-look="dawn"] .oc:not(.oc--patron) { color: var(--br-ink); border-color: rgba(110, 31, 36, .2); background: linear-gradient(90deg, transparent, rgba(110, 31, 36, .35), transparent) top / 70% 1px no-repeat, linear-gradient(160deg, rgba(255, 250, 238, .9), rgba(251, 240, 220, .82)); box-shadow: 0 22px 50px -28px rgba(110, 70, 20, .55); }
-html[data-look="dawn"] .oc:not(.oc--patron) .oc__title, html[data-look="dawn"] .oc:not(.oc--patron) .oc__kicker { color: var(--br-maroon); }
-html[data-look="dawn"] .oc:not(.oc--patron) .oc__kicker .icon { color: #b0702a; }
-html[data-look="dawn"] .oc:not(.oc--patron) .oc__lead, html[data-look="dawn"] .oc:not(.oc--patron) .oc__date, html[data-look="dawn"] .oc:not(.oc--patron) .oc__fact, html[data-look="dawn"] .oc:not(.oc--patron) .oc-arch__name { color: var(--br-ink-2); }
-html[data-look="dawn"] .oc:not(.oc--patron) .oc__who { color: var(--br-ink); }
-html[data-look="dawn"] .oc:not(.oc--patron) .oc__fact b { color: var(--br-maroon); }
-html[data-look="dawn"] .oc:not(.oc--patron) .oc__fact, html[data-look="dawn"] .oc:not(.oc--patron) .oc__date { background: rgba(110, 31, 36, .05); border-color: rgba(110, 31, 36, .16); }
-html[data-look="dawn"] .oc:not(.oc--patron) .oc-arch { background: #f1e2c4; }
+html[data-look="dawn"] .oc:not(.oc--patron):not(.oc--bishop):not(.oc--memorial) { color: var(--br-ink); border-color: rgba(110, 31, 36, .2); background: linear-gradient(90deg, transparent, rgba(110, 31, 36, .35), transparent) top / 70% 1px no-repeat, linear-gradient(160deg, rgba(255, 250, 238, .9), rgba(251, 240, 220, .82)); box-shadow: 0 22px 50px -28px rgba(110, 70, 20, .55); }
+html[data-look="dawn"] .oc:not(.oc--patron):not(.oc--bishop):not(.oc--memorial) .oc__title, html[data-look="dawn"] .oc:not(.oc--patron):not(.oc--bishop):not(.oc--memorial) .oc__kicker { color: var(--br-maroon); }
+html[data-look="dawn"] .oc:not(.oc--patron):not(.oc--bishop):not(.oc--memorial) .oc__kicker .icon { color: #b0702a; }
+html[data-look="dawn"] .oc:not(.oc--patron):not(.oc--bishop):not(.oc--memorial) .oc__lead, html[data-look="dawn"] .oc:not(.oc--patron):not(.oc--bishop):not(.oc--memorial) .oc__date, html[data-look="dawn"] .oc:not(.oc--patron):not(.oc--bishop):not(.oc--memorial) .oc__fact, html[data-look="dawn"] .oc:not(.oc--patron):not(.oc--bishop):not(.oc--memorial) .oc-arch__name { color: var(--br-ink-2); }
+html[data-look="dawn"] .oc:not(.oc--patron):not(.oc--bishop):not(.oc--memorial) .oc__who { color: var(--br-ink); }
+html[data-look="dawn"] .oc:not(.oc--patron):not(.oc--bishop):not(.oc--memorial) .oc__fact b { color: var(--br-maroon); }
+html[data-look="dawn"] .oc:not(.oc--patron):not(.oc--bishop):not(.oc--memorial) .oc__fact, html[data-look="dawn"] .oc:not(.oc--patron):not(.oc--bishop):not(.oc--memorial) .oc__date { background: rgba(110, 31, 36, .05); border-color: rgba(110, 31, 36, .16); }
+html[data-look="dawn"] .oc:not(.oc--patron):not(.oc--bishop):not(.oc--memorial) .oc-arch { background: #f1e2c4; }
 
 @media (prefers-reduced-motion: reduce) { .oc__more > summary .icon { transition: none; } }
 
@@ -304,4 +304,61 @@ html[data-look="dawn"] .ch-row__main small { color: var(--br-ink-2); }
   .br-church-top { text-decoration: none; display: inline-flex !important; align-items: center; gap: 6px; width: auto !important; padding: 0 14px; font-weight: 800; font-size: .86rem; color: var(--gold-hi); }
   .br-church-top .icon { width: 18px; height: 18px; }
   .br-church-top[aria-current] { border-color: rgba(var(--gold-hi-rgb), .6); background: rgba(var(--gold-hi-rgb), .12); }
+}
+
+/* ======================================================================================================
+ * Each father his own look (owner 2026-11-25):
+ *   .oc--bishop    our bishop today (Anba Ilarion) and His Holiness: royal blue, gold filigree, a crown of light
+ *   .oc--memorial  «مثلث الرحمات» Anba Theophilus, and Anba Makarios, who served long: candlelight, antique gold, sepia
+ * ====================================================================================================== */
+.oc__badge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px; border-radius: 99px; font-weight: 900; font-size: .8rem; }
+.oc__badge .icon { width: 15px; height: 15px; }
+
+.oc--bishop {
+  --oc-arch-w: 140px;
+  border-color: rgba(var(--gold-hi-rgb), .65);
+  background:
+    linear-gradient(90deg, transparent, rgba(var(--gold-hi-rgb), .85), transparent) top / 82% 1px no-repeat,
+    linear-gradient(90deg, transparent, rgba(var(--gold-hi-rgb), .5), transparent) bottom / 60% 1px no-repeat,
+    repeating-linear-gradient(135deg, rgba(var(--gold-hi-rgb), .035) 0 2px, transparent 2px 14px),
+    radial-gradient(120% 150% at 100% 0%, #1d4f9c 0%, #12336e 45%, #0a1c40 100%);
+  box-shadow: inset 0 0 0 5px rgba(8, 22, 52, .92), inset 0 0 0 6px rgba(var(--gold-hi-rgb), .38), 0 26px 70px -26px rgba(4, 14, 40, .9);
+  padding: 24px 26px 20px;
+}
+.oc--bishop .oc__title { color: #ffe9b8; font-size: 1.9rem; }
+.oc--bishop .oc__who { color: #fff6e0; }
+.oc--bishop .oc__lead, .oc--bishop .oc__date, .oc--bishop .oc__tag, .oc--bishop .oc__src, .oc--bishop .oc__fact { color: #dbe6fb; }
+.oc--bishop .oc__badge { color: #0a1c40; background: linear-gradient(180deg, #fff1c9, var(--gold)); }
+.oc--bishop .oc__badge .icon { color: #12336e; }
+.oc--bishop .oc-arch { border-color: var(--gold-hi); background: #0a1c40; box-shadow: 0 0 0 5px rgba(var(--gold-hi-rgb), .18), 0 0 0 9px rgba(29, 79, 156, .5), 0 -14px 40px 2px rgba(255, 214, 140, .32), 0 18px 36px -14px rgba(0, 0, 0, .8); }
+
+.oc--memorial {
+  --oc-arch-w: 140px;
+  border-color: rgba(214, 178, 120, .55);
+  background:
+    linear-gradient(90deg, transparent, rgba(232, 200, 140, .7), transparent) top / 80% 1px no-repeat,
+    radial-gradient(60% 90% at 88% 40%, rgba(255, 196, 110, .28) 0%, rgba(255, 196, 110, 0) 70%),
+    radial-gradient(120% 150% at 100% 0%, #3d2f22 0%, #241b14 50%, #120d0a 100%);
+  box-shadow: inset 0 0 0 5px rgba(18, 13, 10, .92), inset 0 0 0 6px rgba(214, 178, 120, .3), 0 26px 70px -26px rgba(0, 0, 0, .9);
+  padding: 24px 26px 20px;
+}
+.oc--memorial .oc__title { color: #f3dcb0; font-size: 1.85rem; }
+.oc--memorial .oc__who { color: #fbf0dc; }
+.oc--memorial .oc__lead, .oc--memorial .oc__date, .oc--memorial .oc__tag, .oc--memorial .oc__src, .oc--memorial .oc__fact { color: #e3d3bb; }
+.oc--memorial .oc__fact b { color: #f3dcb0; }
+.oc--memorial .oc__badge { color: #2a1f17; background: linear-gradient(180deg, #fbf0dc, #d6b278); }
+.oc--memorial .oc__badge .icon { color: #6e1f24; }
+.oc--memorial .oc-arch { border-color: #d6b278; background: #241b14; box-shadow: 0 0 0 5px rgba(214, 178, 120, .14), 0 0 46px 8px rgba(255, 190, 100, .3), 0 18px 36px -14px rgba(0, 0, 0, .85); }
+.oc--memorial .oc-arch img { filter: sepia(.12) saturate(.95); }
+/* a small candle flame over the arch */
+.oc--memorial .oc__pics::before { content: ""; position: absolute; z-index: 5; top: -14px; inset-inline-start: calc(var(--oc-arch-w) / 2 - 5px); width: 10px; height: 16px; border-radius: 50% 50% 45% 45% / 65% 65% 35% 35%; background: radial-gradient(circle at 50% 70%, #fff6d6 0 25%, #ffc65c 45%, rgba(255, 120, 30, .0) 75%); filter: drop-shadow(0 0 6px rgba(255, 190, 90, .9)); }
+html[data-look="dawn"] .oc.oc--bishop, html[data-look="dawn"] .oc.oc--memorial { color: var(--text); }
+
+/* the «كنيستنا» list: the same colours, quietly */
+.ch-row--bishop { border-color: rgba(var(--gold-hi-rgb), .4); background: linear-gradient(90deg, rgba(29, 79, 156, .4), rgba(29, 79, 156, .08)); }
+.ch-row--memorial { border-color: rgba(214, 178, 120, .4); background: linear-gradient(90deg, rgba(61, 47, 34, .65), rgba(61, 47, 34, .12)); }
+.ch-row--memorial .ch-row__pic { border-color: #d6b278; }
+@media (max-width: 640px) {
+  .oc--bishop, .oc--memorial { --oc-arch-w: 100px; padding: 18px 16px 16px; }
+  .oc--bishop .oc__title, .oc--memorial .oc__title { font-size: 1.4rem; }
 }

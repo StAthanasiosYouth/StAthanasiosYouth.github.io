@@ -137,15 +137,17 @@ function occasionCard(list, iso) {
   const src = o.source || (f && f.source);
   const kicker = patron
     ? `<span class="oc__crown">${si('cross')}شفيع كنيستنا</span><span class="oc__tag">مناسبات كنيستنا</span>`
+    : o.badge ? `<span class="oc__badge">${si(o.look === 'memorial' ? 'star' : 'church')}${esc(o.badge)}</span><span class="oc__tag">مناسبات كنيستنا</span>`
     : `<span class="oc__tag">${si(ICON[o.type])}مناسبات كنيستنا · ${esc(TYPE[o.type])}</span>`;
-  const who = o.from && !patron ? byId(o.from.person).name : patron ? byId('mercurius').name : '';
+  const base = o.from && !patron ? byId(o.from.person).name : patron ? byId('mercurius').name : (o.people || []).length === 1 ? byId(o.people[0]).name : '';
+  const who = base && o.honor ? o.honor + ' ' + base.replace(/^الأنبا /, 'الأنبا ') : base;
   const facts = y ? `<span class="oc__fact">${si('calendar')}الذكرى الـ<b>${AR(y)}</b></span>` : '';
   const more = patron ? `<details class="oc__more" ${q.get('open') === '1' ? 'open' : ''}><summary><span class="oc__open">اقرا السنكسار والتمجيد</span><span class="oc__close">اقفل</span>${si('chevron')}</summary>
       <div class="oc__more-body">${PATRON_WORD.map(t => `<p>${esc(t)}</p>`).join('')}
         ${praiseTeaser()}
         <p class="oc__praise-title" style="margin-top:14px">أعياد شفيع كنيستنا في السنة</p>${patronDays(o, iso)}
       </div></details>` : '';
-  return `<section class="oc oc--${o.type}" aria-labelledby="oc-title" data-occasion="${o.id}">
+  return `<section class="oc oc--${o.type}${o.look ? ' oc--' + o.look : ''}" aria-labelledby="oc-title" data-occasion="${o.id}">
     ${picsBlock(o, pics)}
     <div class="oc__body">
       <p class="oc__kicker">${kicker}<span class="oc__date">${copticText(iso)} · ${AR(gDay(iso).d)} ${GM[gDay(iso).m - 1]}</span></p>
@@ -243,7 +245,7 @@ function churchScreen() {
     const pic = pictures(o)[0]; const n = inDays(at); const ym = at.slice(0, 7);
     const head = ym !== month ? `<li class="ch-month">${GM[+at.slice(5, 7) - 1]} ${AR(at.slice(0, 4))}</li>` : ''; month = ym;
     const who = o.from && o.type !== 'patron' ? byId(o.from.person).name : (o.people || []).map(id => byId(id).name).join(' و') || byId('mercurius').name;
-    return head + `<li><button class="ch-row${o.type === 'patron' ? ' ch-row--patron' : ''}" type="button" data-open="${o.id}" data-at="${at}">
+    return head + `<li><button class="ch-row${o.type === 'patron' ? ' ch-row--patron' : ''}${o.look ? ' ch-row--' + o.look : ''}" type="button" data-open="${o.id}" data-at="${at}">
       <span class="ch-row__date"><b>${AR(+at.slice(8))}</b><small>${GM[+at.slice(5, 7) - 1]}</small></span>
       ${pic ? `<span class="oc-arch ch-row__pic"><img src="${pic.src}" alt="" ${pic.crop ? `style="object-position:${pic.crop.x}% ${pic.crop.y}%"` : ''} loading="lazy"></span>` : ''}
       <span class="ch-row__main"><b>${esc(o.headline.replace(/^النهارده /, ''))}</b><small>${esc(who)}</small><small class="ch-row__cop">${copticText(at)} · ${esc(TYPE[o.type])}</small></span>
