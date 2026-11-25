@@ -31192,6 +31192,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     r.classList.add('sa');
     if (gateView(r, 'المناسبات')) return [r];
     r.append(dirtyBar() || el('span', { hidden: true }));
+    // owner 2026-11-25: the corner's own mark, «مناسبات كنيستنا» beside «خبزنا اليومي»
+    r.append(el('div', { class: 'oca-hero' }, el('img', { class: 'oca-hero__bread', src: '../assets/img/bread/mark-128.webp', alt: '', width: '44', height: '44' }), el('span', { class: 'oca-hero__line', 'aria-hidden': 'true' }), el('img', { class: 'oca-hero__logo', src: '../assets/img/bread/church-logo-256.webp', alt: 'شعار مناسبات كنيستنا', width: '88', height: '88' }), el('div', { class: 'oca-hero__text' }, el('b', { text: 'مناسبات كنيستنا' }), el('small', { text: 'تاريخ بنعيشه... وذكريات بتجمعنا' }))));
     var all = occasions().map(function (it) { return { it: it, o: it.data, at: nextOcc(it.data) }; });
     var f = SA.occF || '';
     var shown = all.filter(function (x) { return !f || x.o.type === f; }).sort(function (a, b) { return (a.at || '9') < (b.at || '9') ? -1 : 1; });

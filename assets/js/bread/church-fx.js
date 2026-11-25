@@ -53,9 +53,9 @@ const logo = () => (svgText ||= fetch(A('assets/img/bread/church-logo.svg')).the
 let nth = 0;
 const own = svg => { const p = 'cl' + (++nth) + '-'; return { p, svg: svg.replace(/^<\?xml[^>]*>\s*/, '').replace(/id="([^"]+)"/g, `id="${p}$1"`).replace(/url\(#([^)]+)\)/g, `url(#${p}$1)`).replace(/href="#([^"]+)"/g, `href="#${p}$1"`) }; };
 const E = 'cubic-bezier(.22, 1, .36, 1)';
-export async function entrance(day) {
-  if (store.get('bread.ch.in') === day || store.get('bread.fx') === 'off') return;
-  store.set('bread.ch.in', day);
+export async function entrance(day, { force = false } = {}) {
+  if (!force && (store.get('bread.ch.in') === day || store.get('bread.fx') === 'off')) return;
+  if (!force) store.set('bread.ch.in', day);
   const text = await logo();
   if (!text) return;
   const L = own(text);
@@ -142,15 +142,16 @@ function attach(card, run) {
 }
 
 /* ---------- each card by its nature, once a day ---------- */
-export function reveal(root, day) {
-  if (store.get('bread.fx') === 'off') return;   // the tests (and nobody else) turn the effects off
+export function reveal(root, day, { force = false } = {}) {
+  if (!force && store.get('bread.fx') === 'off') return;   // the tests (and nobody else) turn the effects off
   for (const card of root.querySelectorAll('.oc[data-occasion]:not(.oc--fx)')) {
     card.classList.add('oc--fx');
     const id = card.dataset.occasion, key = 'bread.oc.fx.' + id;
     const running = RUN.get(id);
-    if (running && !running.done && !card.closest('dialog')) { attach(card, running); continue; }
-    if (store.get(key) === day || card.closest('dialog')) continue;
-    store.set(key, day);
+    if (!force && running && !running.done && !card.closest('dialog')) { attach(card, running); continue; }
+    if (!force && (store.get(key) === day || card.closest('dialog'))) continue;
+    if (!force) store.set(key, day);
+    if (force && running) { running.done = true; if (running.audio) running.audio.pause(); }
     if (reduced()) { card.classList.add('oc--soft'); continue; }
     if (card.classList.contains('oc--patron')) attach(card, hymn(id, OPEN.patron));
     else if (card.classList.contains('oc--family')) attach(card, hymn(id, OPEN.family));

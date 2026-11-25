@@ -902,10 +902,22 @@ function registerOffline() {
  * P5: «شوف الكارت» in the admin (?preview=occ): the admin's draft occasion comes by postMessage from the same origin
  * only, and the card is drawn on this page's own CSS, on that day — nothing is loaded, counted or remembered.
  */
+/*
+ * owner 2026-11-25: the preview shows the section's entrance and the card's reveal (the hymn, the light…) as the youth
+ * will see them, every time it is opened; «شوف الدخلة بالصوت» plays them again, with the sound (a tap inside the frame).
+ */
+function previewDraw(body, occasion) {
+  const draw = () => {
+    app.innerHTML = `<div class="backdrop" aria-hidden="true"><div class="backdrop__glow"></div><div class="backdrop__lattice"></div></div><main id="main" class="br-preview-occ"><section class="br-dawn br-dawn--rest"><span class="br-dawn__rays" aria-hidden="true"></span>${body}${HILLS}</section>${occasion ? `<button class="br-preview-play" type="button" data-preview-play>${bi('sound')}شوف الدخلة بالصوت</button>` : ''}</main>`;
+    paintFrames(app);
+  };
+  const play = async () => { draw(); await churchEntrance(S.day, { force: true }); draw(); churchReveal(app, S.day, { force: true }); };
+  app.onclick = e => { if (e.target.closest('[data-preview-play]')) play(); };
+  if (occasion) play(); else draw();
+}
 function previewMode() {
   html.classList.remove('has-tabbar');
   if (cover) cover.remove();
-  try { localStorage.setItem('bread.fx', 'off'); } catch { /* the preview shows the card itself, no entrance */ }
   app.innerHTML = '<main id="main" aria-busy="true"></main>';
   /*
    * owner 2026-11-25: the «الأعياد» tab's phone is this page too (?preview=feast), so it is always the live design: a day
@@ -921,8 +933,7 @@ function previewMode() {
     S.occ = occ ? cleanOccasions(occ) : null;
     const list = S.occ ? occasionsOnDay(S.occ, day) : [];
     const body = list.length ? occasionCard(list, day, { file: S.occ, word: S.feast && feastHidden(S.feast, list) ? S.feast.word : null, medText, open: true }) : feast();
-    app.innerHTML = `<div class="backdrop" aria-hidden="true"><div class="backdrop__glow"></div><div class="backdrop__lattice"></div></div><main id="main" class="br-preview-occ"><section class="br-dawn br-dawn--rest"><span class="br-dawn__rays" aria-hidden="true"></span>${body}${HILLS}</section></main>`;
-    paintFrames(app);
+    previewDraw(body, list.length > 0);
     if (!list.length) fillFeastPraise();
   });
   addEventListener('message', e => {
@@ -931,8 +942,7 @@ function previewMode() {
     const day = /^\d{4}-\d{2}-\d{2}$/.test(e.data.day || '') ? e.data.day : S.day;
     if (!file || !file.occasions.length) return;
     S.occ = file; S.day = day; S.view = 'rest';
-    app.innerHTML = `<div class="backdrop" aria-hidden="true"><div class="backdrop__glow"></div><div class="backdrop__lattice"></div></div><main id="main" class="br-preview-occ"><section class="br-dawn br-dawn--rest"><span class="br-dawn__rays" aria-hidden="true"></span>${occasionCard(file.occasions, day, { file, medText, open: true })}${HILLS}</section></main>`;
-    paintFrames(app);
+    previewDraw(occasionCard(file.occasions, day, { file, medText, open: true }), true);
   });
 }
 
