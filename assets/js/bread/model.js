@@ -132,6 +132,9 @@ export function feastOn(file, day) {
   if (out.img && !TAKLA_URL.test(out.img) && !SAINT_IMG.test(out.img) && !MEDIA_IMG.test(out.img)) out.img = '';
   // P4: «صورة تعبيرية» on an AI or painted picture (the file's imgAi, set from the album's type)
   out.imgAi = !!out.img && f.imgAi === true;
+  // P5: whose day it is (the registry's id and day): «مناسبات كنيستنا» may stand for it
+  out.person = typeof f.person === 'string' && /^[a-z0-9]{1,40}$/.test(f.person) ? f.person : '';
+  out.kind = out.person ? s(f.kind, 120) : '';
   if (out.praise && !HTTPS_URL.test(out.praise)) out.praise = '';
   if (!out.praise) out.praiseText = out.praiseTitle = ''; // a praise is shown only with its source
   return out;

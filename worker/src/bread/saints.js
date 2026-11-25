@@ -394,7 +394,8 @@ export function occasionsFile(reg) {
     if (pictures.length) x.pictures = pictures;
     if (f.source) x.source = f.source;
     if (o.from) x.from = [o.from.person, o.from.feast];
-    x.hides = hidesOf(o);
+    // [person, day, name]: the name too, for a feasts file published before P5 (no person id in it)
+    x.hides = hidesOf(o).map(([p, k]) => [p, k, (people.get(p) || {}).name || '']);
     return x;
   }).filter(Boolean);
   const patrons = {};

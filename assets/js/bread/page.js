@@ -17,7 +17,9 @@ import { playIntro, logoSvg } from './intro.js';
 import { stripTashkeel, agpeyaPsalm } from './text.js';
 import { parseRef, taklaUrl } from './refs.js';
 import { AR, cairoDay, programsOn, dayOf, dateText, clock, bareName, mmss, newSeed, SEED, dayDiff, feastOn, TAKLA_URL as TAKLA } from './model.js';
-import { loadIndex, loadDay, loadFeasts, beacon, session, me, reflect, reflectEdit, reflectDelete, saveLook } from './api.js';
+import { loadIndex, loadDay, loadFeasts, loadOccasions, beacon, session, me, reflect, reflectEdit, reflectDelete, saveLook } from './api.js';
+import { occasionsOnDay, feastHidden, nextDate } from './occasions.js';
+import { occasionCard, churchScreen, praiseSheet, viewerHtml, paintFrames } from './occasions-view.js';
 import { readFace, RETURN_KEY, FROM_KEY } from '../account/link.js';
 import { soundEnabled, setSoundEnabled } from '../sound.js';
 
@@ -54,7 +56,8 @@ setLookAttr(ls.get('bread.look'));
 /* ---------------- state ---------------- */
 
 const S = {
-  screen: q0.get('s') === 'reminders' ? 'reminders' : 'today',
+  screen: q0.get('s') === 'reminders' ? 'reminders' : q0.get('s') === 'church' ? 'church' : 'today',
+  occ: null,               // P5: «مناسبات كنيستنا» (the clean occasions file), null while off
   view: 'boot',            // boot | closed | rest | today
   day: cairoDay(),
   program: null, next: null, last: null,
@@ -91,6 +94,7 @@ function topbar() {
     </a>
     <div class="topbar__actions">
       <button class="topbar__btn" type="button" data-act="sound" aria-pressed="${on}" aria-label="أصوات الواجهة: ${on ? 'شغالة' : 'مقفولة'}">${bi(on ? 'sound' : 'soundOff')}</button>
+      ${S.occ && S.view !== 'closed' ? `<a class="topbar__btn br-church-top" href="?s=church" data-nav="church" ${S.screen === 'church' ? 'aria-current="page"' : ''} aria-label="كنيستنا">${si('church')}<span>كنيستنا</span></a>` : ''}
       ${S.view === 'closed' ? '' : `<a class="topbar__btn" href="?s=reminders" data-nav="reminders" aria-label="إعداداتي">${bi('remind')}</a>`}
       <a class="acct-badge topbar__btn" href="${ROOT.href}account/" data-acct aria-label="${S.acct === 'none' ? 'سجّل دخولك' : 'حسابي'}"><span class="acct-badge__face">${badgeFace()}</span></a>
     </div>
@@ -99,7 +103,7 @@ function topbar() {
 function tabbar(on) {
   const tab = (key, icon, word, href) => `<a class="tabbar__tab" href="${href}" data-tab="${key}" ${key === on ? 'aria-current="page"' : ''}>${icon}<span class="tabbar__word">${word}</span></a>`;
   return `<nav class="tabbar" aria-label="أقسام خبزنا اليومي"><span class="tabbar__lens" aria-hidden="true"></span><div class="tabbar__slots">
-    ${tab('today', bi('bread'), 'النهارده', '?')}${S.view === 'closed' ? '' : tab('reminders', bi('remind'), 'إعداداتي', '?s=reminders')}${tab('site', bi('home'), 'الموقع', ROOT.href)}
+    ${tab('today', bi('bread'), 'النهارده', '?')}${S.occ && S.view !== 'closed' ? tab('church', si('church'), 'كنيستنا', '?s=church') : ''}${S.view === 'closed' ? '' : tab('reminders', bi('remind'), 'إعداداتي', '?s=reminders')}${tab('site', bi('home'), 'الموقع', ROOT.href)}
   </div><a class="acct-badge tabbar__tab tabbar__fixed" href="${ROOT.href}account/" data-acct data-tab="account"><span class="acct-badge__face">${badgeFace()}</span><span class="tabbar__word">حسابي</span></a></nav>`;
 }
 function placeLens() {
@@ -122,6 +126,7 @@ function dawn() {
   const t = S.topic, i = S.info;
   return `<section class="br-dawn" aria-labelledby="br-title">
     <span class="br-dawn__rays" aria-hidden="true"></span>
+    ${occTop()}
     <p class="br-day" data-d="0">${dateText(S.day)} <i></i> اليوم ${AR(i.dayNo)} من ${AR(i.ofDays)}</p>
     <h1 class="br-title" id="br-title" data-d="1">${esc(t.title)}</h1>
     <p class="br-verse" data-d="2"><q>${esc(tx(t.verse))}</q></p>
@@ -175,9 +180,24 @@ function meditation() {
  * W7: a saint's feast or a church feast on today's DATE (not the program day), from the month's feasts file.
  * Shown after the reflection (the owner's order: verse, reading, meditation, the youth's own words, then the feast).
  */
+/* P5: today's «مناسبات كنيستنا» (one card; the first leads) */
+const occToday = () => occasionsOnDay(S.occ, S.day);
+/* a patron's Synaxarium word: the feasts file's word for that day, as «نحب نفكّرك» would have shown it */
+function patronWord(list) {
+  const o = list[0], f = S.feast;
+  if (!o || !f || (o.type !== 'patron' && o.type !== 'family')) return null;
+  return feastHidden(f, [o]) ? f.word : null;
+}
+function occTop() {
+  const list = occToday();
+  return list.length ? occasionCard(list, S.day, { file: S.occ, word: patronWord(list), medText }) : '';
+}
+
 function feast() {
   const f = S.feast;
   if (!f) return '';
+  // P5: a day «مناسبات كنيستنا» stands for is never repeated here
+  if (S.occ && feastHidden(f, occToday())) return '';
   // one picture, lazy; an AI or painted one carries a small «صورة تعبيرية» (P4, owner 2026-11-24). Never a photographer's name.
   const pic = f.img ? `<figure class="br-feast__fig"><span class="br-feast__pic"><img class="br-feast__img" src="${esc(f.img)}" alt="${esc(f.name)}" loading="lazy" decoding="async" referrerpolicy="no-referrer">${f.imgAi ? '<span class="br-feast__ai">صورة تعبيرية</span>' : ''}</span></figure>` : '';
   // the saint's own praise (tamgeed / madih) from the registry, always with its source (owner, 2026-11-19)
@@ -187,7 +207,9 @@ function feast() {
     : '';
   const praiseLink = !lines.length && f.praise ? ` · <a href="${esc(f.praise)}" target="_blank" rel="noopener">التمجيد</a>` : '';
   const src = TAKLA.test(f.url) ? 'سنكسار موقع الأنبا تكلا' : 'المصدر';
-  return `<section class="widget br-card br-feast" data-d="0"><h2 class="br-kicker">${bi('sun')}نحب نفكّرك</h2>${pic}<p class="br-feast__name">النهارده تذكار ${esc(f.name)}</p>${f.title && f.title !== f.name ? `<p class="br-feast__title">${esc(f.title)}</p>` : ''}${medText(f.word)}${praise}<p class="br-med__by br-med__src">من <a href="${esc(f.url)}" target="_blank" rel="noopener">${src}</a>${praiseLink}</p></section>`;
+  // P5 (owner 2026-11-25): the reposed popes keep a papal touch here
+  const pope = /^(القديس )?البابا /.test(f.name);
+  return `<section class="widget br-card br-feast${pope ? ' br-feast--pope' : ''}" data-d="0"><h2 class="br-kicker">${bi('sun')}نحب نفكّرك${pope ? `<span class="br-feast__badge">${si('cross')}من بطاركة كنيستنا</span>` : ''}</h2>${pic}<p class="br-feast__name">النهارده تذكار ${esc(f.name)}</p>${f.title && f.title !== f.name ? `<p class="br-feast__title">${esc(f.title)}</p>` : ''}${medText(f.word)}${praise}<p class="br-med__by br-med__src">من <a href="${esc(f.url)}" target="_blank" rel="noopener">${src}</a>${praiseLink}</p></section>`;
 }
 
 /*
@@ -284,13 +306,69 @@ function renderToday() {
   return `${topbar()}<main id="main">${dawn()}<div class="br-main"><div class="br-side br-side--read">${late}${paper()}</div><div class="br-side">${meditation()}${question()}${done()}${feast()}${remindTeaser()}</div></div>${signature()}</main>${tabbar('today')}`;
 }
 
+/* ---------------- P5: the «كنيستنا» tab, the pictures, the full praise ---------------- */
+
+function renderChurch() {
+  const list = occToday();
+  const today = list.length ? occasionCard(list, S.day, { file: S.occ, word: patronWord(list), medText }) : '';
+  return `${topbar()}${churchScreen(S.occ, S.day, { todayCard: today })}${tabbar('church')}`;
+}
+function dialog(cls, label, inner) {
+  document.querySelectorAll('dialog.' + cls).forEach(d => d.remove());
+  const d = document.createElement('dialog');
+  d.className = cls;
+  d.setAttribute('aria-label', label);
+  d.innerHTML = inner;
+  document.body.append(d);
+  paintFrames(d);
+  d.addEventListener('close', () => d.remove());
+  d.showModal();
+  return d;
+}
+function openViewer(id, at) {
+  const o = S.occ && S.occ.occasions.find(x => x.id === id);
+  const fam = S.occ && S.occ.patrons.family;
+  const ps = o && o.type === 'family' && fam ? [{ img: fam.img, ai: fam.ai, caption: fam.name }] : o ? o.pictures : [];
+  if (!ps.length) return;
+  let i = Math.max(0, Math.min(ps.length - 1, at || 0));
+  const d = dialog('oc-view', 'صور المناسبة', viewerHtml(ps, i));
+  d.addEventListener('click', e => {
+    const st = e.target.closest('[data-step]');
+    if (st) { i = (i + +st.dataset.step + ps.length) % ps.length; d.innerHTML = viewerHtml(ps, i); return; }
+    if (e.target === d || e.target.closest('[data-close-view]')) d.close();
+  });
+}
+function openPraise(id) {
+  const k = S.occ && Object.keys(S.occ.patrons).find(x => S.occ.patrons[x].id === id);
+  const p = k && S.occ.patrons[k];
+  if (!p || !p.praise || !p.praise.verses.length) return;
+  const d = dialog('pr', p.praise.title || p.name, praiseSheet({ ...p, kind: k }));
+  d.setAttribute('aria-labelledby', 'pr-title');
+  d.addEventListener('click', e => {
+    const z = e.target.closest('.pr__btn[data-size]');   // not <html data-size>
+    if (z) { setSize(+z.dataset.size); return; }
+    if (e.target === d || e.target.closest('[data-pr-close]')) d.close();
+  });
+}
+function openOccasion(id, at) {
+  const o = S.occ && S.occ.occasions.find(x => x.id === id);
+  if (!o) return;
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(at || '') ? at : nextDate(o, S.day);
+  const d = dialog('ch-sheet', o.headline, `<button class="oc-view__btn ch-sheet__x" type="button" data-sheet-close aria-label="اقفل">${si('close')}</button><p class="ch-sheet__when">${esc(dateText(day))}</p>${occasionCard([o], day, { file: S.occ, medText, sheet: day !== S.day })}`);
+  d.addEventListener('click', e => {
+    const v = e.target.closest('[data-view]'); if (v) { openViewer(o.id, +v.dataset.view); return; }
+    const pr = e.target.closest('[data-praise]'); if (pr) { openPraise(pr.dataset.praise); return; }
+    if (e.target === d || e.target.closest('[data-sheet-close]')) d.close();
+  });
+}
+
 /* ---------------- no reading today: finished / waiting / nothing yet / not open ---------------- */
 
 function restPage(title, text, extra = '') {
   return `${topbar()}<main id="main">
     <section class="br-dawn br-dawn--rest"><span class="br-dawn__rays" aria-hidden="true"></span>
       <div class="br-rest"><div class="br-rest__logo"><span class="br-rest__glow"></span><img src="${IMG.logo}" width="300" height="300" alt=""></div>
-        <h1>${title}</h1><p>${text}</p></div>${HILLS}</section>
+        <h1>${title}</h1><p>${text}</p></div>${S.view === 'rest' ? occTop() : ''}${HILLS}</section>
     <div class="br-sheet-page br-sheet-page--rest">
       ${extra}
       <a class="btn btn--block" href="${ROOT.href}">${bi('home')}ارجع للموقع</a>
@@ -366,6 +444,7 @@ function signinSheet() {
 
 function view() {
   if (S.view === 'boot') return `${topbar()}<main id="main" aria-busy="true"></main>`;
+  if (S.screen === 'church' && S.occ && S.view !== 'closed') return renderChurch();
   if (S.view === 'closed' || S.view === 'rest') return renderRest();
   return S.screen === 'reminders' ? renderReminders() : renderToday();
 }
@@ -374,6 +453,7 @@ function render() {
   const focus = document.activeElement && document.activeElement.matches('.br-field textarea') ? { sel: document.activeElement.selectionStart } : null;
   app.innerHTML = `<div class="backdrop" aria-hidden="true"><div class="backdrop__glow"></div><div class="backdrop__lattice"></div></div>${view()}${S.sheet === 'share' ? shareSheet() : ''}${S.sheet === 'signin' ? signinSheet() : ''}<p class="br-toast" id="toast" role="status"></p>`;
   paintRings();
+  paintFrames(app);
   requestAnimationFrame(placeLens);
   if (focus) { const ta = app.querySelector('.br-field textarea'); if (ta) { ta.focus(); try { ta.setSelectionRange(focus.sel, focus.sel); } catch { /* fine */ } } }
   if (S.sheet) app.querySelector('.br-sheet')?.focus();
@@ -400,7 +480,7 @@ function toast(text) {
 function go(screen, { replace = false } = {}) {
   S.screen = screen;
   S.sheet = null;
-  const url = screen === 'reminders' ? '?s=reminders' : location.pathname;
+  const url = screen === 'reminders' ? '?s=reminders' : screen === 'church' ? '?s=church' : location.pathname;
   history[replace ? 'replaceState' : 'pushState']({ bread: screen }, '', url);
   render();
   scrollTo(0, 0);
@@ -585,7 +665,14 @@ app.addEventListener('click', e => {
   const nav = e.target.closest('[data-nav]');
   if (nav) { e.preventDefault(); go(nav.dataset.nav); return; }
   const tab = e.target.closest('.tabbar__tab[href^="?"]');
-  if (tab) { e.preventDefault(); go(tab.dataset.tab === 'reminders' ? 'reminders' : 'today'); return; }
+  if (tab) { e.preventDefault(); go(tab.dataset.tab === 'reminders' ? 'reminders' : tab.dataset.tab === 'church' ? 'church' : 'today'); return; }
+  // P5: the pictures, the full praise, an occasion from the «كنيستنا» tab
+  const v = e.target.closest('[data-view]');
+  if (v) { const card = v.closest('.oc'); openViewer(card ? card.dataset.occasion : '', +v.dataset.view); return; }
+  const pr = e.target.closest('[data-praise]');
+  if (pr) { openPraise(pr.dataset.praise); return; }
+  const op = e.target.closest('[data-open]');
+  if (op) { openOccasion(op.dataset.open, op.dataset.at); return; }
   if (e.target.matches('.br-add__time')) { try { e.target.showPicker(); } catch { /* the field itself still works */ } return; }
   const a = e.target.closest('[data-act]');
   if (!a || a.matches('input')) return;
@@ -629,7 +716,8 @@ app.addEventListener('input', e => {
   const sendBtn = app.querySelector('[data-act="send"]'); if (sendBtn) sendBtn.disabled = !v.trim();
 });
 addEventListener('popstate', () => {
-  S.screen = new URLSearchParams(location.search).get('s') === 'reminders' ? 'reminders' : 'today';
+  const sq = new URLSearchParams(location.search).get('s');
+  S.screen = sq === 'reminders' ? 'reminders' : sq === 'church' && S.occ ? 'church' : 'today';
   S.sheet = null;
   render();
   if (S.screen === 'reminders') loadReminders();
@@ -674,6 +762,7 @@ async function boot() {
     return;
   }
   if (playOnLoad) intro(); else dropCover();
+  const occP = loadOccasions();
   const { live, next, last } = programsOn(index, S.day);
   S.program = live; S.next = next; S.last = last;
   // the index lists only the live and the next program: the one this device read is remembered for «خلّصنا»
@@ -697,6 +786,10 @@ async function boot() {
     S.topic = topic;
     S.feast = feastOn(feasts, S.day);
   }
+  S.occ = await occP;
+  // a patron's day without a program: the Synaxarium word still comes from the feasts file
+  if (!live && S.occ && occToday().some(o => o.type === 'patron' || o.type === 'family')) S.feast = feastOn(await loadFeasts(S.day.slice(0, 7)), S.day);
+  if (S.screen === 'church' && !S.occ) S.screen = 'today';
   S.view = S.topic ? 'today' : 'rest';
   render();
   if (location.hash === '#reflect') requestAnimationFrame(() => document.getElementById('reflect')?.scrollIntoView({ block: 'start' }));

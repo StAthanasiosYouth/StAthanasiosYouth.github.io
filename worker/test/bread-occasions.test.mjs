@@ -104,7 +104,7 @@ test('occasions.json: resolved days, names, pictures from the albums, what each 
   assert.equal(f.occasions.length, 16);
   const red = f.occasions.find(o => o.id === 'redseadiocese');
   assert.deepEqual([red.gregorian, red.year, red.who], ['06-14', 1992, 'مثلث الرحمات الأنبا ثاؤفيلس أول أسقف للبحر الأحمر']);
-  assert.deepEqual(red.hides, [['theophilus', 'تذكار رسامته']]);
+  assert.deepEqual(red.hides, [['theophilus', 'تذكار رسامته', 'الأنبا ثاؤفيلس أول أسقف للبحر الأحمر']]);
   assert.ok(red.pictures.every(p => /^\/media\/\d{4}\//.test(p.img)));
   const two = f.occasions.find(o => o.id === 'ordination2021');
   assert.deepEqual(two.names, ['أبونا أنجيلوس مراد', 'أبونا فيلوباتير روماني']);

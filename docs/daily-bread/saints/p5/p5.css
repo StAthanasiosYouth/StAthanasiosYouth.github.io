@@ -203,7 +203,7 @@ html[data-look="dawn"] .oc:not(.oc--patron):not(.oc--bishop):not(.oc--memorial) 
 .pr__btn .icon { width: 18px; height: 18px; }
 .pr__btn--sm { font-size: .8rem; } .pr__btn--lg { font-size: 1.1rem; }
 .pr__body {
-  flex: 1; overflow: auto; overscroll-behavior: contain; padding: 26px clamp(18px, 6vw, 64px) 34px;
+  flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 26px clamp(18px, 6vw, 64px) 34px;
   background: radial-gradient(120% 50% at 50% 0%, rgba(255, 255, 255, .55), rgba(255, 255, 255, 0) 60%), linear-gradient(180deg, var(--br-paper) 0%, var(--br-paper-2) 100%);
   scrollbar-color: rgba(110, 31, 36, .35) transparent;
 }

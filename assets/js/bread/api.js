@@ -11,6 +11,7 @@
 import { bookApiUrl } from '../page/book-config.js';
 import { readSession } from '../account/link.js';
 import { cleanTopic } from './model.js';
+import { cleanOccasions } from './occasions.js';
 
 const ROOT = new URL('../../../', import.meta.url);
 export const ON_KEY = 'bread.on';
@@ -66,6 +67,27 @@ export async function loadIndex() {
   if (out.state === 'on') set('localStorage', ON_KEY, '1');
   if (out.state === 'off') set('localStorage', ON_KEY, null);
   return out;
+}
+
+/*
+ * P5 «مناسبات كنيستنا» → the clean file | null. Its own switch (BREAD_OCCASIONS): the Worker says `disabled` → null
+ * (no card, no «كنيستنا» tab). The static copy only when the Worker is unreachable and this device saw it on.
+ */
+export const OCC_KEY = 'bread.occ.on';
+export async function loadOccasions() {
+  const worker = getJson(api() + '/v1/bread/file/occasions', WORKER_MAX_MS).then(r => {
+    if (r.status === 200 && r.body) return { on: true, file: r.body };
+    if (r.body && (r.body.code === 'disabled' || r.body.code === 'not_found')) return { on: false };
+    return null;
+  }, () => null);
+  let out = await worker;
+  if (!out && get('localStorage', OCC_KEY) === '1') {
+    const st = await getJson(new URL('daily-bread/data/occasions.json', ROOT).href, WORKER_MAX_MS).catch(() => null);
+    if (st && st.status === 200 && st.body) out = { on: true, file: st.body };
+  }
+  if (out && out.on) set('localStorage', OCC_KEY, '1');
+  if (out && !out.on) set('localStorage', OCC_KEY, null);
+  return out && out.on ? cleanOccasions(out.file) : null;
 }
 
 /* the day's file: static and Worker together, the first good one wins → topic | null */
