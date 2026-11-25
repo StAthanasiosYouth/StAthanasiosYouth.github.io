@@ -9,6 +9,8 @@
  *   ?d=YYYY-MM-DD   the day shown (default: the next occasion)      &v=today|rest     a program today, or none
  *   &w=desktop|phone  the captured markup (default: by width)        &look=dawn        the light look
  *   &open=1           «اقرا…» open                                     &pics=1           the pictures viewer open
+ *   &tab=church2      the «كنيستنا» tab as the owner asked on 2026-11-25 (proposal): today's card, or a calm empty
+ *                     state; «مناسباتنا الجاية» opens the nearest few only (&next=1 opens it). No archive, no history.
  */
 import { iconSvg } from '../../../../assets/js/icons.js';
 import { bi } from '../../../../assets/js/bread/icons.js';
@@ -241,13 +243,14 @@ if (q.get('size')) html.dataset.size = q.get('size');
 if (q.get('praise') === '1') openPraise();
 document.title = `P5 المعاينة — ${list.length ? list[0].headline : 'يوم عادي'} (${day})`;
 /* ---------- the «كنيستنا» tab: our patron, today, and what is coming (owner 2026-11-25) ---------- */
-const TAB = q.get('tab') === 'church';
+const TAB = q.get('tab') === 'church' || q.get('tab') === 'church2';
+const TAB2 = q.get('tab') === 'church2';
 function tabbarWithChurch() {
   const slots = app.querySelector('.tabbar__slots'); if (!slots) return;
   // wide screens have no bottom bar: the same place in the top bar
-  app.querySelector('.topbar__actions')?.insertAdjacentHTML('afterbegin', `<a class="topbar__btn br-church-top" href="?tab=church&d=${day}&w=${size}" ${TAB ? 'aria-current="page"' : ''} aria-label="كنيستنا">${si('church')}<span>كنيستنا</span></a>`);
+  app.querySelector('.topbar__actions')?.insertAdjacentHTML('afterbegin', `<a class="topbar__btn br-church-top" href="?tab=${TAB2 ? 'church2' : 'church'}&d=${day}&w=${size}" ${TAB ? 'aria-current="page"' : ''} aria-label="كنيستنا">${si('church')}<span>كنيستنا</span></a>`);
   const today = slots.querySelector('[data-tab="today"]');
-  today.insertAdjacentHTML('afterend', `<a class="tabbar__tab" href="?tab=church&d=${day}&w=${size}" data-tab="church">${si('church')}<span class="tabbar__word">كنيستنا</span></a>`);
+  today.insertAdjacentHTML('afterend', `<a class="tabbar__tab" href="?tab=${TAB2 ? 'church2' : 'church'}&d=${day}&w=${size}" data-tab="church">${si('church')}<span class="tabbar__word">كنيستنا</span></a>`);
   if (TAB) { today.removeAttribute('aria-current'); slots.querySelector('[data-tab="church"]').setAttribute('aria-current', 'page'); }
   requestAnimationFrame(() => {
     const bar = app.querySelector('.tabbar'), cur = bar.querySelector('[aria-current]'), lens = bar.querySelector('.tabbar__lens');
@@ -295,9 +298,50 @@ function openOccasion(id, at) {
   document.body.append(d); d.showModal();
   d.addEventListener('click', e => { if (e.target === d || e.target.closest('[data-sheet-close]')) { d.close(); d.remove(); } });
 }
+/* ---------- the «كنيستنا» tab, owner 2026-11-25 (proposal): today, or a calm empty state + «مناسباتنا الجاية» ---------- */
+const NEXT_N = 4;
+const nextList = () => OCC.occasions.map(o => ({ o, at: nextDate(dayOf(o), day) })).filter(x => x.at && x.at !== day).sort((a, b) => a.at < b.at ? -1 : 1).slice(0, NEXT_N);
+const whoOf = o => o.from && o.type !== 'patron' && o.type !== 'family' ? byId(o.from.person).name : o.type === 'family' ? byId('athanasius').name : (o.people || []).map(id => byId(id).name).join(' و') || byId('mercurius').name;
+const left = n => n === 1 ? 'بكره' : n === 2 ? 'بعد يومين' : n < 11 ? `فاضل ${AR(n)} أيام` : `فاضل ${AR(n)} يوم`;
+function churchScreen2() {
+  const todayList = occasionsOn(day);
+  const first = nextList()[0];
+  const pic = first && pictures(first.o)[0];
+  const today = todayList.length
+    ? `<h2 class="ch-h">${bi('sun')}النهارده</h2>${occasionCard(todayList, day)}`
+    : `<section class="widget br-card ch-empty"><span class="ch-empty__seal" aria-hidden="true">${si('church')}</span>
+        <h2 class="ch-empty__title">مفيش مناسبات خاصة بكنيستنا النهارده</h2>
+        <p class="ch-empty__text">أول ما ييجي عيد لشفيع كنيستنا أو أسرتنا، أو مناسبة لإيبارشيتنا وآبائنا، هتلاقيها هنا في أول اليوم.</p></section>`;
+  const next = first ? `<button class="ch-next" type="button" data-next>
+      ${pic ? `<span class="oc-arch ch-next__pic"><img src="${pic.src}" alt="" ${pic.crop ? `style="object-position:${pic.crop.x}% ${pic.crop.y}%"` : ''}></span>` : ''}
+      <span class="ch-next__main"><small class="ch-next__k">${si('calendar')}مناسباتنا الجاية</small><b>${esc(first.o.headline.replace(/^النهارده /, ''))}</b><small>${esc(dateText(first.at))} · ${left(inDays(first.at))}</small></span>
+      <span class="ch-next__go">${si('chevron')}</span></button>` : '';
+  return `<main id="main" class="br-sheet-page ch">
+    <div class="br-h1"><span class="br-remind__ic">${si('church')}</span><div><h1>كنيستنا</h1><p>مناسبات كنيستنا وإيبارشيتنا وآبائنا، في يومها.</p></div></div>
+    ${today}${next}
+  </main>`;
+}
+function openNext() {
+  const rows = nextList().map(({ o, at }) => {
+    const p = pictures(o)[0]; const n = inDays(at);
+    return `<li><button class="ch-nx${o.type === 'patron' ? ' ch-nx--patron' : ''}" type="button" data-open="${o.id}" data-at="${at}">
+      <span class="oc-arch ch-nx__pic">${p ? `<img src="${p.src}" alt="" ${p.crop ? `style="object-position:${p.crop.x}% ${p.crop.y}%"` : ''} loading="lazy">` : ''}</span>
+      <span class="ch-nx__main"><b>${esc(o.headline.replace(/^النهارده /, ''))}</b><small>${esc(whoOf(o))}</small>
+        <small class="ch-nx__date">${esc(dateText(at))} · ${copticText(at)}</small></span>
+      <span class="ch-nx__left${n <= 7 ? ' is-near' : ''}"><b>${AR(n)}</b><small>${n === 1 ? 'يوم' : n < 11 ? 'أيام' : 'يوم'}</small></span></button></li>`;
+  }).join('');
+  const d = document.createElement('dialog'); d.className = 'ch-sheet ch-nextsheet';
+  d.innerHTML = `<button class="oc-view__btn ch-sheet__x" type="button" data-sheet-close aria-label="اقفل">${si('close')}</button>
+    <h2 class="ch-nextsheet__h">${si('calendar')}مناسباتنا الجاية</h2><p class="ch-nextsheet__sub">أقرب ${AR(NEXT_N)} مناسبات تخص كنيستنا</p>
+    <ol class="ch-nxs">${rows}</ol>`;
+  document.body.append(d); d.showModal();
+  d.addEventListener('click', e => { if (e.target === d || e.target.closest('[data-sheet-close]')) { d.close(); d.remove(); } });
+}
 if (TAB) {
   const main = app.querySelector('#main');
-  main.outerHTML = churchScreen();
+  main.outerHTML = TAB2 ? churchScreen2() : churchScreen();
+  if (TAB2) document.addEventListener('click', e => { if (e.target.closest('[data-next]')) openNext(); });
+  if (TAB2 && q.get('next')) openNext();
   document.addEventListener('click', e => { const b = e.target.closest('[data-open]'); if (b) openOccasion(b.dataset.open, b.dataset.at); });
   if (q.get('open')) { const x = OCC.occasions.find(o => o.id === q.get('open')); if (x) openOccasion(x.id, nextDate(dayOf(x), day)); }
 }

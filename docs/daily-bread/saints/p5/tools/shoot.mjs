@@ -32,6 +32,10 @@ export const SCREENS = [
   ['11-church-tab', 'member.html?tab=church&d=2026-11-25', true],
   ['12-church-open', 'member.html?tab=church&d=2026-11-25&open=redseadiocese', false],
   ['13-church-today', 'member.html?tab=church&d=2026-12-04', false],
+  // owner 2026-11-25 (proposal): the tab as a calm empty state + «مناسباتنا الجاية», and a day with an occasion
+  ['30-church2-empty', 'member.html?tab=church2&d=2026-11-26', false],
+  ['31-church2-next', 'member.html?tab=church2&d=2026-11-26&next=1', false],
+  ['32-church2-today', 'member.html?tab=church2&d=2026-12-04', false],
   ['14-bishop', 'member.html?d=2027-06-09', false],
   ['15-memorial-makarios', 'member.html?d=2027-02-03', false],
   ['16-pope', 'member.html?d=2027-11-18', false],
