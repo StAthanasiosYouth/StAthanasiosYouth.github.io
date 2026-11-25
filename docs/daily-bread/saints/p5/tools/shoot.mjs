@@ -36,6 +36,8 @@ export const SCREENS = [
   ['15-memorial-makarios', 'member.html?d=2027-02-03', false],
   ['16-pope', 'member.html?d=2027-11-18', false],
   ['17-pope-feast', 'member.html?d=2027-05-10', true],
+  ['18-family', 'member.html?d=2027-05-15', false],
+  ['19-family-open', 'member.html?d=2027-05-15&open=1', true],
   ['10-dawn-patron', 'member.html?d=2027-06-16&look=dawn', false],
   ['20-admin-list', 'admin.html', true],
   ['21-admin-edit', 'admin.html?m=edit&id=redseadiocese', false],

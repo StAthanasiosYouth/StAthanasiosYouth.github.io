@@ -105,8 +105,8 @@ function picsBlock(o, pics) {
   return `<div class="oc__pics">${arch(pics[0], 0)}</div>`;
 }
 const shortName = n => n.replace(/^أبونا /, 'أبونا ').replace(/ روماني$| مراد$/, m => m);
-function patronDays(o, iso) {
-  const p = byId('mercurius');
+function patronDays(o, iso, id = 'mercurius') {
+  const p = byId(id);
   return `<div class="oc__days">${p.feasts.map(f => { const at = nextDate(f, iso); const cur = isOn(f, iso); return `<div class="oc__day" ${cur ? 'aria-current="date"' : ''}><b>${esc(f.kind)}</b>${AR(+f.coptic.split('-')[1])} ${MONTHS[+f.coptic.split('-')[0] - 1]} · ${cur ? 'النهارده' : esc(dateText(at).replace(/^\S+ /, ''))}</div>`; }).join('')}</div>`;
 }
 /* the praise in the card: its first stanza about the saint (the first one is to the Virgin), then the full reader */
@@ -128,9 +128,33 @@ function praiseSheet() {
       <footer class="pr__end"><span>المصدر: <a href="${esc(PRAISE.source)}" target="_blank" rel="noopener">${esc(new URL(PRAISE.source).hostname.replace(/^www./, ''))}</a></span><button class="pr__done" type="button" data-pr-close>${si('check')}ربنا يباركك، ارجع لليوم</button></footer>
     </div>`;
 }
+/* Pope Athanasius, the patron of our youth family (owner 2026-11-25, via the coordinator): a round seal like the
+   family's own logo, navy and gold, the family's seal watermark; his Synaxarium word and his days of the year */
+const FAMILY_WORD = [
+  'البابا العشرين من بابوات الإسكندرية، وعاش في القرن الرابع. اتعرف بـ«حامي الإيمان»، لأنه وقف قدام بدعة آريوس اللي أنكرت لاهوت المسيح، ودافع عن إيمان مجمع نيقية.',
+  'اتنفى من كرسيه كذا مرة بسبب ثباته، وكل مرة كان بيرجع لشعبه. وكتب كتب كتير، منها «تجسد الكلمة» و«حياة الأنبا أنطونيوس».'
+];
+function familyCard(o, iso) {
+  const p = byId(o.from.person); const a = p.album[0]; const f = dayOf(o);
+  return `<section class="oc oc--family" aria-labelledby="oc-title" data-occasion="${o.id}" data-key="occ:${o.id}:${iso.slice(0, 4)}">
+    <div class="oc__pics"><button class="oc-seal" type="button" data-view="0" aria-label="${esc(p.name)}"><img src="${ROOT + a.media}" alt="" style="object-position:${a.crop ? a.crop.x + '% ' + a.crop.y + '%' : '50% 30%'}"><span class="oc-arch__ai">صورة تعبيرية</span></button><img class="oc-seal__logo" src="${ROOT}assets/img/logo-128.webp" alt="شعار الأسرة" width="46" height="46"></div>
+    <div class="oc__body">
+      <p class="oc__kicker"><span class="oc__family">${si('book')}شفيع أسرتنا</span><span class="oc__tag">أسرة البابا أثناسيوس الرسولي للشباب</span><span class="oc__date">${copticText(iso)} · ${AR(gDay(iso).d)} ${GM[gDay(iso).m - 1]}</span></p>
+      <h2 class="oc__title" id="oc-title">${esc(o.headline)}</h2>
+      <p class="oc__who">${esc(p.name)}</p>
+      <p class="oc__lead">${esc(o.lead)}</p>
+      <details class="oc__more" ${q.get('open') === '1' ? 'open' : ''}><summary><span class="oc__open">اقرا سيرته وأعياده</span><span class="oc__close">اقفل</span>${si('chevron')}</summary>
+        <div class="oc__more-body">${FAMILY_WORD.map(t => `<p>${esc(t)}</p>`).join('')}
+          <p class="oc__praise-title" style="margin-top:14px">أعياد شفيع أسرتنا في السنة</p>${patronDays(o, iso, p.id)}
+        </div></details>
+      <p class="oc__src">من <a href="${esc(f.source)}" target="_blank" rel="noopener">سنكسار موقع الأنبا تكلا</a></p>
+    </div>
+  </section>`;
+}
 function occasionCard(list, iso) {
   if (!list.length) return '';
   const o = list[0];
+  if (o.type === 'family') return familyCard(o, iso);
   const patron = o.type === 'patron';
   const pics = pictures(o);
   const f = dayOf(o);
@@ -148,7 +172,7 @@ function occasionCard(list, iso) {
         ${praiseTeaser()}
         <p class="oc__praise-title" style="margin-top:14px">أعياد شفيع كنيستنا في السنة</p>${patronDays(o, iso)}
       </div></details>` : '';
-  return `<section class="oc oc--${o.type}${o.look ? ' oc--' + o.look : ''}" aria-labelledby="oc-title" data-occasion="${o.id}">
+  return `<section class="oc oc--${o.type}${o.look ? ' oc--' + o.look : ''}" aria-labelledby="oc-title" data-occasion="${o.id}" data-key="occ:${o.id}:${iso.slice(0, 4)}">
     ${picsBlock(o, pics)}
     <div class="oc__body">
       <p class="oc__kicker">${kicker}<span class="oc__date">${copticText(iso)} · ${AR(gDay(iso).d)} ${GM[gDay(iso).m - 1]}</span></p>
@@ -245,7 +269,7 @@ function churchScreen() {
   const rows = next.filter(x => x.at !== day).map(({ o, at }) => {
     const pic = pictures(o)[0]; const n = inDays(at); const ym = at.slice(0, 7);
     const head = ym !== month ? `<li class="ch-month">${GM[+at.slice(5, 7) - 1]} ${AR(at.slice(0, 4))}</li>` : ''; month = ym;
-    const who = o.from && o.type !== 'patron' ? byId(o.from.person).name : (o.people || []).map(id => byId(id).name).join(' و') || byId('mercurius').name;
+    const who = o.from && o.type !== 'patron' && o.type !== 'family' ? byId(o.from.person).name : o.type === 'family' ? byId('athanasius').name : (o.people || []).map(id => byId(id).name).join(' و') || byId('mercurius').name;
     return head + `<li><button class="ch-row${o.type === 'patron' ? ' ch-row--patron' : ''}${o.look ? ' ch-row--' + o.look : ''}" type="button" data-open="${o.id}" data-at="${at}">
       <span class="ch-row__date"><b>${AR(+at.slice(8))}</b><small>${GM[+at.slice(5, 7) - 1]}</small></span>
       ${pic ? `<span class="oc-arch ch-row__pic"><img src="${pic.src}" alt="" ${pic.crop ? `style="object-position:${pic.crop.x}% ${pic.crop.y}%"` : ''} loading="lazy"></span>` : ''}
@@ -254,9 +278,14 @@ function churchScreen() {
   }).join('');
   return `<main id="main" class="br-sheet-page ch">
     <div class="br-h1"><span class="br-remind__ic">${si('church')}</span><div><h1>كنيستنا</h1><p>أعياد شفيع كنيستنا، ومناسبات إيبارشيتنا وآبائنا، وكل اللي جاي.</p></div></div>
-    ${todayList.some(o => o.type === 'patron') ? '' : patron}${todayCard}
+    ${todayList.some(o => o.type === 'patron') ? '' : patron}${todayList.some(o => o.type === 'family') ? '' : familyBox()}${todayCard}
     <section class="widget br-card ch-soon"><h2 class="br-kicker">${si('calendar')}الجاي</h2><ol class="ch-list">${rows}</ol></section>
   </main>`;
+}
+function familyBox() {
+  const p = byId('athanasius'); const a = p.album[0];
+  return `<section class="ch-family"><span class="oc-seal ch-family__pic" aria-hidden="true"><img src="${ROOT + a.media}" alt="" style="object-position:${a.crop ? a.crop.x + '% ' + a.crop.y + '%' : '50% 30%'}"><span class="oc-arch__ai">صورة تعبيرية</span></span>
+    <div class="ch-family__body"><p class="oc__kicker"><span class="oc__family">${si('book')}شفيع أسرتنا</span></p><h2 class="oc__title">${esc(p.name)}</h2>${patronDays(null, day, p.id)}</div></section>`;
 }
 function openOccasion(id, at) {
   const o = OCC.occasions.find(x => x.id === id);
