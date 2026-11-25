@@ -126,8 +126,8 @@ function attach(card, run) {
   const nameAt = +ev.querySelector('.oc-ev__l--name [data-t]').dataset.t, img = ev.querySelector('.oc-ev__face');
   const finish = () => {
     run.done = true;
-    ev.classList.add('is-out'); card.classList.remove('oc--event'); card.classList.add('oc--shown');
-    setTimeout(() => ev.remove(), 1100);
+    // the opening gives its place to the card itself, which rises in
+    ev.remove(); card.classList.remove('oc--event'); card.classList.add('oc--shown');
   };
   const paint = now => { words.forEach(w => w.classList.toggle('on', now >= +w.dataset.t)); if (img) img.classList.toggle('on', now >= nameAt); return now >= last - 0.2; };
   const tick = () => {

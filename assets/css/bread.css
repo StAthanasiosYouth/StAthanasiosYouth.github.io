@@ -1341,9 +1341,11 @@ html[data-look="dawn"] .oc.oc--bishop, html[data-look="dawn"] .oc.oc--memorial {
 .ch-in__flash { position: absolute; width: min(36vw, 230px); aspect-ratio: 1; border-radius: 50%; background: radial-gradient(closest-side, #fffbe8, rgba(255, 231, 166, .6) 35%, transparent); mix-blend-mode: screen; }
 /* the hymn: the card waits under a veil while the words are written with the voice */
 .oc { position: relative; }
-.oc.oc--event > :not(.oc-ev) { visibility: hidden; }   /* not opacity: the card's own entry animation would win over it */
-.oc.oc--shown > :not(.oc-ev) { transition: opacity .9s ease; }
-.oc-ev { position: absolute; inset: 0; z-index: 3; isolation: isolate; overflow: hidden; display: grid; align-content: center; justify-items: center; gap: 6px; padding: 18px; text-align: center; border-radius: inherit; background: radial-gradient(120% 90% at 50% 40%, rgba(70, 12, 22, .94), rgba(12, 2, 6, .98)); cursor: pointer; transition: opacity 1s ease; }
+/* the opening IS the card while it plays, a screen's height whatever the card's length (a whole praise makes it long) */
+.oc.oc--event > :not(.oc-ev) { display: none; }
+.oc.oc--event { display: block; padding: 0; }   /* one full-width opening, whatever the card's own layout */
+.oc.oc--shown > :not(.oc-ev) { animation: oc-rise .9s cubic-bezier(.22, 1, .36, 1) both; }
+.oc-ev { position: relative; min-height: min(68vh, 520px); z-index: 3; isolation: isolate; overflow: hidden; display: grid; align-content: center; justify-items: center; gap: 6px; padding: 18px; text-align: center; border-radius: inherit; background: radial-gradient(120% 90% at 50% 40%, rgba(70, 12, 22, .94), rgba(12, 2, 6, .98)); cursor: pointer; transition: opacity 1s ease; }
 .oc--family .oc-ev { background: radial-gradient(120% 90% at 50% 40%, rgba(14, 40, 80, .94), rgba(3, 8, 20, .98)); }
 .oc-ev.is-out { opacity: 0; pointer-events: none; }
 .oc-ev__l { margin: 0; font-family: var(--font-display); font-size: clamp(1.25rem, 3.4vw, 1.6rem); line-height: 1.7; color: #f6e2b4; }
