@@ -35,13 +35,15 @@ function pics(o) {
 export function patronDays(p, iso) {
   return `<div class="oc__days">${p.days.map(d => { const cur = isOn(d, iso); const at = nextDate(d, iso); return `<div class="oc__day"${cur ? ' aria-current="date"' : ''}><b>${esc(d.kind)}</b>${d.coptic ? `${AR(+d.coptic.split('-')[1])} ${MONTHS[+d.coptic.split('-')[0] - 1]} · ` : ''}${cur ? 'النهارده' : at ? esc(dateText(at).replace(/^\S+ /, '')) : ''}</div>`; }).join('')}</div>`;
 }
-/* the praise in a card: its first verse and «اقرا التمجيد كامل» (the full one on our own page, owner 2026-11-25) */
+/* the praise in a card: whole, every stanza and its response (owner 2026-11-25: always whole, no button) */
 function praiseTeaser(p) {
   const pr = p.praise;
   if (!pr) return '';
-  const first = pr.verses.length ? [...pr.verses[0], ...(pr.refrain ? [pr.refrain] : [])] : pr.text.split('\n');
-  return `<blockquote class="oc__praise"><p class="oc__praise-title">${esc(pr.title || 'من التمجيد')}</p><p class="oc__praise-text">${first.map(esc).join('<br>')}</p>
-    ${pr.verses.length ? `<button class="oc__praise-go" type="button" data-praise="${esc(p.id)}">${bi('reading')}اقرا التمجيد كامل <small>${AR(pr.verses.length)} مقطع</small></button>` : `<p class="br-med__by"><a href="${esc(pr.source)}" target="_blank" rel="noopener">التمجيد كامل</a></p>`}</blockquote>`;
+  const host = (() => { try { return new URL(pr.source).hostname.replace(/^www\./, ''); } catch { return ''; } })();
+  const body = pr.verses.length
+    ? pr.verses.map(v => `<p class="oc__praise-st">${v.map(esc).join('<br>')}${pr.refrain ? `<br><span class="oc__praise-ref">${esc(pr.refrain)}</span>` : ''}</p>`).join('')
+    : `<p class="oc__praise-text">${pr.text.split('\n').map(esc).join('<br>')}</p>`;
+  return `<blockquote class="oc__praise oc__praise--full"><p class="oc__praise-title">${esc(pr.title || 'التمجيد')}</p>${body}${host ? `<p class="br-med__by">المصدر: <a href="${esc(pr.source)}" target="_blank" rel="noopener">${esc(host)}</a></p>` : ''}</blockquote>`;
 }
 
 /*

@@ -29134,12 +29134,14 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var list = st && st.list ? st.list : [];
     var chosen = list.filter(function (f) { return f.date === BR.feastPick; })[0] || list[0] || null;
     BR.feastPick = chosen ? chosen.date : null;
-    BR.previewDay = chosen ? { feastOnly: true, date: chosen.date, feast: { name: chosen.name, title: chosen.title, word: chosen.word, img: chosen.img, imgAi: !!chosen.imgAi, url: chosen.sourceUrl, praise: chosen.praise, praiseTitle: chosen.praiseTitle, praiseText: chosen.praiseText, praiseId: chosen.praiseId, person: chosen.id } } : null;
+    BR.previewDay = chosen ? { feastOnly: true, date: chosen.date, feast: { name: chosen.name, title: chosen.title, word: chosen.word, img: chosen.img, imgAi: !!chosen.imgAi, url: chosen.sourceUrl, praise: chosen.praise, praiseTitle: chosen.praiseTitle, praiseText: chosen.praiseText, praiseId: chosen.praiseId, person: chosen.id, kind: chosen.kind } } : null;
     var block = feastsBlock(month, function (f) { BR.feastPick = f.date; A.render(); });
     if (!chosen) { r.append(block); }
     else {
-      var frame = el('iframe', { src: 'bread/preview.html', title: 'معاينة', tabindex: '-1' });
-      frame.addEventListener('load', function () { if (frame.contentWindow) frame.contentWindow.postMessage({ type: 'bread-preview' }, location.origin); });
+      // owner 2026-11-25: the live page itself (its ?preview=feast mode), so the phone is always today's design: an
+      // occasion's day shows its «مناسبات كنيستنا» card, any other its «نحب نفكّرك»
+      var frame = el('iframe', { src: '../daily-bread/?preview=feast', title: 'معاينة', tabindex: '-1' });
+      frame.addEventListener('load', function () { if (frame.contentWindow && BR.previewDay) frame.contentWindow.postMessage({ type: 'bread:feast-preview', day: BR.previewDay.date, feast: BR.previewDay.feast }, location.origin); });
       r.append(cols('ba-cols--review', block, card('phone', 'معاينة ' + dateWord(chosen.date), chosen.name + ' · من غير موضوع', null,
         el('div', { class: 'ba-phone' }, el('div', { class: 'ba-phone__screen' }, frame)), 'ba-pv')));
     }

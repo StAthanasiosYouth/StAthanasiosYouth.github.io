@@ -905,7 +905,26 @@ function registerOffline() {
 function previewMode() {
   html.classList.remove('has-tabbar');
   if (cover) cover.remove();
+  try { localStorage.setItem('bread.fx', 'off'); } catch { /* the preview shows the card itself, no entrance */ }
   app.innerHTML = '<main id="main" aria-busy="true"></main>';
+  /*
+   * owner 2026-11-25: the «الأعياد» tab's phone is this page too (?preview=feast), so it is always the live design: a day
+   * of «مناسبات كنيستنا» (our patron, our family's patron…) shows that card, never «نحب نفكّرك»; any other day its
+   * «نحب نفكّرك» card with its praise whole. The published occasions (the static file) decide which.
+   */
+  addEventListener('message', async e => {
+    if (e.origin !== location.origin || !e.data || e.data.type !== 'bread:feast-preview') return;
+    const day = /^\d{4}-\d{2}-\d{2}$/.test(e.data.day || '') ? e.data.day : S.day;
+    S.day = day; S.feastPraise = null; S.season = null;
+    S.feast = e.data.feast ? feastOn({ feasts: [{ ...e.data.feast, date: day }] }, day) : null;
+    const occ = await fetch(new URL('daily-bread/data/occasions.json', ROOT).href).then(r => (r.ok ? r.json() : null), () => null);
+    S.occ = occ ? cleanOccasions(occ) : null;
+    const list = S.occ ? occasionsOnDay(S.occ, day) : [];
+    const body = list.length ? occasionCard(list, day, { file: S.occ, word: S.feast && feastHidden(S.feast, list) ? S.feast.word : null, medText, open: true }) : feast();
+    app.innerHTML = `<div class="backdrop" aria-hidden="true"><div class="backdrop__glow"></div><div class="backdrop__lattice"></div></div><main id="main" class="br-preview-occ"><section class="br-dawn br-dawn--rest"><span class="br-dawn__rays" aria-hidden="true"></span>${body}${HILLS}</section></main>`;
+    paintFrames(app);
+    if (!list.length) fillFeastPraise();
+  });
   addEventListener('message', e => {
     if (e.origin !== location.origin || !e.data || e.data.type !== 'bread:occ-preview') return;
     const file = cleanOccasions(e.data.file);
@@ -917,4 +936,4 @@ function previewMode() {
   });
 }
 
-if (q0.get('preview') === 'occ') previewMode(); else boot();
+if (q0.get('preview') === 'occ' || q0.get('preview') === 'feast') previewMode(); else boot();

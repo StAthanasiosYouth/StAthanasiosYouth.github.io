@@ -1362,3 +1362,8 @@ html[data-look="dawn"] .oc.oc--bishop, html[data-look="dawn"] .oc.oc--memorial {
 @keyframes oc-light { 0% { opacity: 0; transform: translateY(-30%); } 40% { opacity: 1; } 100% { opacity: 0; transform: none; } }
 @keyframes oc-rise { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .oc--candle, .oc--soft, .oc--candle::after, .oc--light::after { animation: oc-fade .4s both; } @keyframes oc-fade { from { opacity: 0; } to { opacity: 1; } } }
+
+/* the praise in an occasion card, whole (owner 2026-11-25) */
+.oc__praise--full .oc__praise-st { margin: 0; padding: 10px 0; text-align: center; font-family: var(--br-amiri, inherit); font-size: 1.02rem; line-height: 2; }
+.oc__praise--full .oc__praise-st + .oc__praise-st { border-top: 1px solid rgba(255, 255, 255, .08); }
+.oc__praise--full .oc__praise-ref { color: var(--gold); }

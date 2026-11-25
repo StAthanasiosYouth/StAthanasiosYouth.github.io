@@ -87,19 +87,11 @@ test('Abu Sefein (25 Hatour): ONE card at the top of the day, never again in «�
   assert.match(await text(page, '.oc__more-body'), /كلمة السنكسار عن أبي سيفين/, 'the feasts file word');
   assert.equal(await page.$$eval('.oc__day', n => n.length), 3);
   assert.ok(await page.$('.oc__day[aria-current="date"]'));
-  await page.$eval('[data-praise]', b => b.scrollIntoView({ block: 'center' }));   // above the phone's tab bar
-  await page.click('[data-praise]');
-  await page.waitForSelector('dialog.pr[open]');
-  assert.equal(await page.$$eval('.pr__st', n => n.length), 35);
-  assert.match(await text(page, '.pr__st'), /تعالوا نتهلل بالألحان/);
-  assert.match(await text(page, '.pr__end'), /avarewase\.org/);
-  const size = await page.evaluate(() => document.documentElement.dataset.size);
-  await page.click('.pr__btn--lg');
-  assert.equal(await page.evaluate(() => document.documentElement.dataset.size), String(+size + 1));
-  await page.$eval('.pr__done', b => b.scrollIntoView({ block: 'center' }));
-  await page.click('.pr__done');
-  await sleep(300);
-  assert.equal(await page.$('dialog.pr'), null);
+  // owner 2026-11-25: the praise is whole in the card, every stanza with its response, no button
+  assert.equal(await page.$('.oc--patron [data-praise]'), null);
+  assert.equal(await page.$$eval('.oc--patron .oc__praise-st', n => n.length), 35);
+  assert.match(await text(page, '.oc--patron .oc__praise-st'), /تعالوا نتهلل بالألحان/);
+  assert.match(await text(page, '.oc--patron .oc__praise--full'), /avarewase\.org/);
   assert.ok(await noScroll(page) <= 1);
   assert.deepEqual(errors, []);
   await ctx.close();
