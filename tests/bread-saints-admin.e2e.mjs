@@ -387,6 +387,7 @@ test('P5b «التماجيد والمدائح»: several per person, «مؤكد�
   await d.page.waitForSelector('.sa-prs', { timeout: 6000 });
   const rows = await d.page.$$eval('.sa-pr', n => n.map(x => x.textContent));
   assert.ok(rows.some(t => /جاورجيوس/.test(t) && /مؤكد/.test(t) && /الأساسي/.test(t)), rows.join(' | '));
+  await d.page.$eval('.sa-prs', n => n.closest('.card, section, article').scrollIntoView());
   await shot(d.page, '30-praises-d');
   // a new one: confirmed with no text → the dialog stays and says so; as a candidate it saves
   await d.page.click('[data-act="saints-addpraise"]');

@@ -178,11 +178,13 @@ test('P5b: a saint\'s day praise opens in full on our own page (praises.json, re
   const { page, ctx, errors } = await open('2027-05-01');
   await page.waitForSelector('.br-feast');
   assert.match(await text(page, '.br-feast'), /كلام اليوم عن مار جرجس/);
+  if (process.env.SAINTS_SHOTS) { await page.$eval('.br-feast', n => n.scrollIntoView()); await sleep(400); await page.screenshot({ path: '../docs/daily-bread/saints/p5/shots/p5b-feast-card-m.png' }); }
   const asked = [];
   page.on('request', r => { if (/praises/.test(r.url())) asked.push(r.url()); });
   await page.click('[data-feast-praise]');
   await page.waitForSelector('dialog.pr[open] .pr__st');
   assert.ok(asked.length >= 1, 'read when pressed');
+  if (process.env.SAINTS_SHOTS) { await sleep(600); await page.screenshot({ path: '../docs/daily-bread/saints/p5/shots/p5b-praise-sheet-m.png' }); }
   assert.match(await text(page, 'dialog.pr .pr__title'), /جاورجيوس/);
   assert.match(await text(page, 'dialog.pr .pr__kicker'), /تمجيد/);
   assert.ok((await page.$$('dialog.pr .pr__st')).length >= 10);
