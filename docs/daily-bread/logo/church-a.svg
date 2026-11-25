@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1000" height="1000" direction="rtl">
+  <title>مناسبات كنيستنا — شعار القسم (2026-11-25)</title>
+  
+  <defs>
+    <style>
+  @font-face { font-family: 'Aref Ruqaa'; font-weight: 700; src: url('../../../assets/fonts/aref-ruqaa-arabic.woff2') format('woff2'); }
+  @font-face { font-family: 'Cairo'; font-weight: 200 900; src: url('../../../assets/fonts/cairo-arabic.woff2') format('woff2'); }
+  .ruqaa { font-family: 'Aref Ruqaa', serif; font-weight: 700; }
+  .cairo { font-family: 'Cairo', sans-serif; }</style>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0b2a4c"/><stop offset=".42" stop-color="#3c4f7a"/><stop offset=".66" stop-color="#c98a5a"/><stop offset=".8" stop-color="#f2c47a"/><stop offset="1" stop-color="#f7dc9b"/></linearGradient>
+    <radialGradient id="sun" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fffbe8"/><stop offset=".25" stop-color="#ffe7a6" stop-opacity=".95"/><stop offset="1" stop-color="#ffd27a" stop-opacity="0"/></radialGradient>
+    <radialGradient id="lampGlow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffd27a" stop-opacity=".55"/><stop offset="1" stop-color="#ffd27a" stop-opacity="0"/></radialGradient>
+    <linearGradient id="gilt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f2d28b"/><stop offset="1" stop-color="#8c6423"/></linearGradient>
+    <linearGradient id="crust" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d7964a"/><stop offset=".6" stop-color="#a4602a"/><stop offset="1" stop-color="#6e3a14"/></linearGradient>
+    <linearGradient id="goldRing" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f2d28b"/><stop offset=".5" stop-color="#d7aa50"/><stop offset="1" stop-color="#8c6423"/></linearGradient>
+    <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c79a5c"/><stop offset="1" stop-color="#8a6236"/></linearGradient>
+    <clipPath id="disc"><circle cx="500" cy="500" r="392"/></clipPath>
+    <path id="ringTop" d="M 64,500 A 436,436 0 0 1 936,500"/>
+    <path id="ringBottom" d="M 38,500 A 462,462 0 0 0 962,500"/>
+    <radialGradient id="night" cx=".5" cy=".42" r=".62"><stop offset="0" stop-color="#9b2b35"/><stop offset=".45" stop-color="#5a1520"/><stop offset="1" stop-color="#1c060b"/></radialGradient>
+    <radialGradient id="halo" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff1c8" stop-opacity=".95"/><stop offset=".35" stop-color="#f2c47a" stop-opacity=".55"/><stop offset="1" stop-color="#f2c47a" stop-opacity="0"/></radialGradient>
+    <linearGradient id="blade" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e8edf5"/><stop offset=".5" stop-color="#ffffff"/><stop offset="1" stop-color="#aeb8c8"/></linearGradient>
+    <linearGradient id="stone" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbeed2"/><stop offset="1" stop-color="#d1ad6c"/></linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="7" result="b"/><feColorMatrix in="b" values="1 0 0 0 .95  0 1 0 0 .8  0 0 1 0 .45  0 0 0 .8 0"/><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="earth" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3d0f17"/><stop offset="1" stop-color="#14040a"/></linearGradient>
+  </defs>
+  <g id="ring">
+    <circle cx="500" cy="500" r="498" fill="#0b2a4c"/>
+    <circle cx="500" cy="500" r="490" fill="none" stroke="#d7aa50" stroke-width="3"/>
+    <circle cx="500" cy="500" r="398" fill="none" stroke="url(#goldRing)" stroke-width="12"/>
+    <!-- the signature, split over the ring like the family logo: credit on top, the church below -->
+    <text id="ring-credit" class="cairo" font-size="33" font-weight="700" fill="#f2d28b"><textPath href="#ringTop" startOffset="50%" text-anchor="middle"><tspan font-weight="500" fill="#d7aa50">إعداد وإشراف</tspan>  أسرة البابا أثناسيوس الرسولي للشباب</textPath></text>
+    <text id="ring-church" class="cairo" font-size="37" font-weight="700" fill="#f2d28b"><textPath href="#ringBottom" startOffset="50%" text-anchor="middle">كنيسة أبي سيفين بسفاجا</textPath></text>
+    <g fill="#d7aa50" ><path d="M46,475 H62 V492 H79 V508 H62 V525 H46 V508 H29 V492 H46 Z"/><circle cx="46.4" cy="475" r="4.3"/><circle cx="54" cy="471.2" r="4.3"/><circle cx="61.6" cy="475" r="4.3"/><circle cx="79" cy="492.4" r="4.3"/><circle cx="82.8" cy="500" r="4.3"/><circle cx="79" cy="507.6" r="4.3"/><circle cx="61.6" cy="525" r="4.3"/><circle cx="54" cy="528.8" r="4.3"/><circle cx="46.4" cy="525" r="4.3"/><circle cx="29" cy="507.6" r="4.3"/><circle cx="25.2" cy="500" r="4.3"/><circle cx="29" cy="492.4" r="4.3"/></g>
+    <g fill="#d7aa50" ><path d="M938,475 H954 V492 H971 V508 H954 V525 H938 V508 H921 V492 H938 Z"/><circle cx="938.4" cy="475" r="4.3"/><circle cx="946" cy="471.2" r="4.3"/><circle cx="953.6" cy="475" r="4.3"/><circle cx="971" cy="492.4" r="4.3"/><circle cx="974.8" cy="500" r="4.3"/><circle cx="971" cy="507.6" r="4.3"/><circle cx="953.6" cy="525" r="4.3"/><circle cx="946" cy="528.8" r="4.3"/><circle cx="938.4" cy="525" r="4.3"/><circle cx="921" cy="507.6" r="4.3"/><circle cx="917.2" cy="500" r="4.3"/><circle cx="921" cy="492.4" r="4.3"/></g>
+  </g>
+  
+  <g id="scene" clip-path="url(#disc)">
+    <rect id="night-sky" x="0" y="0" width="1000" height="1000" fill="url(#night)"/>
+    <g id="stars" fill="#f2d28b"><circle cx="300" cy="470" r="3"/><circle cx="690" cy="455" r="3.4"/><circle cx="250" cy="560" r="2.4"/><circle cx="760" cy="545" r="2.6"/><circle cx="345" cy="395" r="2"/><circle cx="655" cy="385" r="2.2"/><circle cx="215" cy="470" r="1.8"/><circle cx="790" cy="470" r="1.8"/></g>
+    <circle id="halo-glow" cx="500" cy="520" r="240" fill="url(#halo)" opacity=".75"/>
+    <g id="swords" filter="url(#glow)">
+      <g transform="translate(500 515) rotate(-36) scale(.9) translate(-500 -530)"><g id="sword-a">
+      <path d="M500,300 L516,338 L516,690 L484,690 L484,338 Z" fill="url(#blade)" stroke="#f2d28b" stroke-width="3"/>
+      <path d="M500,318 L500,684" stroke="#9aa6b8" stroke-width="3" opacity=".7"/>
+      <rect x="436" y="688" width="128" height="20" rx="10" fill="url(#gilt)" stroke="#5a3a12" stroke-width="2"/>
+      <circle cx="436" cy="698" r="11" fill="#f2d28b"/><circle cx="564" cy="698" r="11" fill="#f2d28b"/>
+      <rect x="490" y="708" width="20" height="62" rx="6" fill="#5a1a1f" stroke="#c99a4a" stroke-width="2"/>
+      <circle cx="500" cy="782" r="14" fill="url(#gilt)" stroke="#5a3a12" stroke-width="2"/>
+    </g></g>
+      <g transform="translate(500 515) rotate(36) scale(.9) translate(-500 -530)"><g id="sword-b">
+      <path d="M500,300 L516,338 L516,690 L484,690 L484,338 Z" fill="url(#blade)" stroke="#f2d28b" stroke-width="3"/>
+      <path d="M500,318 L500,684" stroke="#9aa6b8" stroke-width="3" opacity=".7"/>
+      <rect x="436" y="688" width="128" height="20" rx="10" fill="url(#gilt)" stroke="#5a3a12" stroke-width="2"/>
+      <circle cx="436" cy="698" r="11" fill="#f2d28b"/><circle cx="564" cy="698" r="11" fill="#f2d28b"/>
+      <rect x="490" y="708" width="20" height="62" rx="6" fill="#5a1a1f" stroke="#c99a4a" stroke-width="2"/>
+      <circle cx="500" cy="782" r="14" fill="url(#gilt)" stroke="#5a3a12" stroke-width="2"/>
+    </g></g>
+    </g>
+    <g id="crown" transform="translate(500 486) scale(.62)">
+      <path d="M-46,10 L-50,-26 L-24,-6 L0,-36 L24,-6 L50,-26 L46,10 Z" fill="url(#gilt)" stroke="#5a3a12" stroke-width="2.5"/>
+      <rect x="-48" y="8" width="96" height="14" rx="5" fill="#f2d28b" stroke="#5a3a12" stroke-width="2"/>
+      <circle cx="0" cy="-38" r="6" fill="#fff3cf"/><circle cx="-50" cy="-28" r="5" fill="#fff3cf"/><circle cx="50" cy="-28" r="5" fill="#fff3cf"/>
+    </g>
+    <path id="hills" d="M0,770 C150,735 300,742 420,758 C560,740 720,736 1000,762 V1000 H0 Z" fill="url(#earth)"/>
+    <g id="church">
+      <rect x="340" y="640" width="50" height="135" fill="url(#stone)"/><rect x="610" y="640" width="50" height="135" fill="url(#stone)"/>
+      <path d="M340,642 A25,25 0 0 1 390,642 Z" fill="url(#stone)"/><path d="M610,642 A25,25 0 0 1 660,642 Z" fill="url(#stone)"/>
+      <g fill="#f2d28b" transform="translate(365 596)"><path d="M-5.115000000000001,-15.950000000000001 H5.115000000000001 V-5.115000000000001 H15.950000000000001 V5.115000000000001 H5.115000000000001 V15.950000000000001 H-5.115000000000001 V5.115000000000001 H-15.950000000000001 V-5.115000000000001 H-5.115000000000001 Z"/><circle cx="-5.1" cy="-16.0" r="2.7"/><circle cx="0.0" cy="-18.4" r="2.7"/><circle cx="5.1" cy="-16.0" r="2.7"/><circle cx="16.0" cy="-5.1" r="2.7"/><circle cx="18.4" cy="0.0" r="2.7"/><circle cx="16.0" cy="5.1" r="2.7"/><circle cx="5.1" cy="16.0" r="2.7"/><circle cx="0.0" cy="18.4" r="2.7"/><circle cx="-5.1" cy="16.0" r="2.7"/><circle cx="-16.0" cy="5.1" r="2.7"/><circle cx="-18.4" cy="0.0" r="2.7"/><circle cx="-16.0" cy="-5.1" r="2.7"/></g><g fill="#f2d28b" transform="translate(635 596)"><path d="M-5.115000000000001,-15.950000000000001 H5.115000000000001 V-5.115000000000001 H15.950000000000001 V5.115000000000001 H5.115000000000001 V15.950000000000001 H-5.115000000000001 V5.115000000000001 H-15.950000000000001 V-5.115000000000001 H-5.115000000000001 Z"/><circle cx="-5.1" cy="-16.0" r="2.7"/><circle cx="0.0" cy="-18.4" r="2.7"/><circle cx="5.1" cy="-16.0" r="2.7"/><circle cx="16.0" cy="-5.1" r="2.7"/><circle cx="18.4" cy="0.0" r="2.7"/><circle cx="16.0" cy="5.1" r="2.7"/><circle cx="5.1" cy="16.0" r="2.7"/><circle cx="0.0" cy="18.4" r="2.7"/><circle cx="-5.1" cy="16.0" r="2.7"/><circle cx="-16.0" cy="5.1" r="2.7"/><circle cx="-18.4" cy="0.0" r="2.7"/><circle cx="-16.0" cy="-5.1" r="2.7"/></g>
+      <rect x="390" y="680" width="220" height="95" fill="url(#stone)"/>
+      <rect x="440" y="640" width="120" height="44" fill="url(#stone)"/>
+      <path d="M430,642 A70,70 0 0 1 570,642 Z" fill="url(#stone)"/>
+      <g fill="#fff3cf" transform="translate(500 540)"><path d="M-6.51,-20.299999999999997 H6.51 V-6.51 H20.299999999999997 V6.51 H6.51 V20.299999999999997 H-6.51 V6.51 H-20.299999999999997 V-6.51 H-6.51 Z"/><circle cx="-6.5" cy="-20.3" r="3.4"/><circle cx="0.0" cy="-23.4" r="3.4"/><circle cx="6.5" cy="-20.3" r="3.4"/><circle cx="20.3" cy="-6.5" r="3.4"/><circle cx="23.4" cy="0.0" r="3.4"/><circle cx="20.3" cy="6.5" r="3.4"/><circle cx="6.5" cy="20.3" r="3.4"/><circle cx="0.0" cy="23.4" r="3.4"/><circle cx="-6.5" cy="20.3" r="3.4"/><circle cx="-20.3" cy="6.5" r="3.4"/><circle cx="-23.4" cy="0.0" r="3.4"/><circle cx="-20.3" cy="-6.5" r="3.4"/></g>
+      <g id="windows" fill="#ffd27a">
+        <path d="M484,775 V738 A16,16 0 0 1 516,738 V775 Z" fill="#5a1520"/><path d="M488,775 V740 A12,12 0 0 1 512,740 V775 Z"/>
+        <path d="M418,742 V718 A10,10 0 0 1 438,718 V742 Z"/><path d="M562,742 V718 A10,10 0 0 1 582,718 V742 Z"/>
+        <path d="M357,700 V682 A8,8 0 0 1 373,682 V700 Z"/><path d="M627,700 V682 A8,8 0 0 1 643,682 V700 Z"/>
+        <path d="M466,664 V650 A7,7 0 0 1 480,650 V664 Z"/><path d="M493,664 V648 A7,7 0 0 1 507,648 V664 Z"/><path d="M520,664 V650 A7,7 0 0 1 534,650 V664 Z"/>
+      </g>
+    </g>
+  </g>
+  <g id="title" clip-path="url(#disc)">
+    <g fill="#f2d28b" id="top-cross"><path d="M488.8,137 H511.2 V160.8 H535 V183.2 H511.2 V207 H488.8 V183.2 H465 V160.8 H488.8 Z"/><circle cx="489.4" cy="137" r="6"/><circle cx="500" cy="131.6" r="6"/><circle cx="510.6" cy="137" r="6"/><circle cx="535" cy="161.4" r="6"/><circle cx="540.4" cy="172" r="6"/><circle cx="535" cy="182.6" r="6"/><circle cx="510.6" cy="207" r="6"/><circle cx="500" cy="212.4" r="6"/><circle cx="489.4" cy="207" r="6"/><circle cx="465" cy="182.6" r="6"/><circle cx="459.6" cy="172" r="6"/><circle cx="465" cy="161.4" r="6"/></g>
+    <text class="ruqaa" x="500" y="296" text-anchor="middle" font-size="112" fill="#f2d28b" stroke="#2a0a10" stroke-width="11" paint-order="stroke">مناسبات كنيستنا</text>
+  </g>
+  <g id="tagline" clip-path="url(#disc)">
+    <text class="cairo" x="500" y="352" text-anchor="middle" font-size="34" font-weight="700" fill="#fff6e0" stroke="#2a0a10" stroke-width="7" paint-order="stroke">أعيادنا وتذكاراتنا في يومها</text>
+  </g>
+  <g id="family-seal">
+    <circle cx="500" cy="846" r="44" fill="#061a31" stroke="url(#goldRing)" stroke-width="5"/>
+    <clipPath id="sealClip"><circle cx="500" cy="846" r="38"/></clipPath>
+    <image href="../../../assets/img/logo-256.webp" x="462" y="808" width="76" height="76" clip-path="url(#sealClip)"/>
+  </g>
+</svg>
