@@ -3977,9 +3977,22 @@
         setTimeout(function () {
           if (dialog.open) dialog.close();
           dialog.remove();
+          // the page behind scrolls again once no dialog is open (owner 2026-11-25)
+          if (!document.querySelector('dialog[open]')) document.documentElement.classList.remove('has-modal');
           if (previous && previous.isConnected) previous.focus({ preventScroll: true });
           resolve(value);
         }, A.reducedMotion() ? 0 : 160);
+      }
+
+      /* options.validate(dialog) → '' or the message: the dialog stays open and says what is missing (owner 2026-11-25:
+         «لو في خانة فاضية يقولي لازم تملالها»), instead of closing and losing what was typed */
+      var errorBox = el('p', { class: 'modal__error', role: 'alert', hidden: true });
+      function invalid(message, field) {
+        errorBox.textContent = message;
+        errorBox.hidden = false;
+        dialog.querySelectorAll('.is-invalid').forEach(function (n) { n.classList.remove('is-invalid'); });
+        if (field && field.classList) { field.classList.add('is-invalid'); field.scrollIntoView({ block: 'center', behavior: A.reducedMotion() ? 'auto' : 'smooth' }); if (field.focus) field.focus({ preventScroll: true }); }
+        else errorBox.scrollIntoView({ block: 'nearest' });
       }
 
       var buttons = (options.actions || [{ label: 'تمام', value: true, kind: 'primary', autofocus: true }]).map(function (action) {
@@ -3987,7 +4000,13 @@
           class: 'btn' + (action.kind ? ' btn--' + action.kind : ''),
           type: 'button',
           text: action.label,
-          onclick: function () { close(action.value); }
+          onclick: function () {
+            if (action.value && options.validate) {
+              var problem = options.validate(dialog);
+              if (problem) { invalid(typeof problem === 'string' ? problem : problem.message, problem.field); return; }
+            }
+            close(action.value);
+          }
         });
         if (action.autofocus) focusTarget = button;
         return button;
@@ -4000,19 +4019,25 @@
         options.message ? el('p', { class: 'modal__text', id: textId, text: options.message }) : null,
         options.body || null,
         A.technicalDetails(options.details),
+        errorBox,
         el('div', { class: 'modal__actions' }, buttons)
       ].filter(Boolean));
 
+      // Escape closes a message, never a form with something typed in it (owner 2026-11-25)
       dialog.addEventListener('cancel', function (event) {
         event.preventDefault();
+        if (options.body && dialog.querySelector('input, textarea, select')) { dialog.classList.remove('is-nudge'); void dialog.offsetWidth; dialog.classList.add('is-nudge'); return; }
         close(null);
       });
 
+      // a click outside never closes it (owner 2026-11-25: «طول منا جوة حاجة … لو دوست برا ميطلعنيش»): a small nudge says «still here»
       dialog.addEventListener('click', function (event) {
-        if (event.target === dialog) close(null);
+        if (event.target !== dialog) return;
+        dialog.classList.remove('is-nudge'); void dialog.offsetWidth; dialog.classList.add('is-nudge');
       });
 
       document.body.appendChild(dialog);
+      document.documentElement.classList.add('has-modal');
       dialog.showModal();
       (focusTarget || buttons[buttons.length - 1]).focus();
       if (options.setup) options.setup(dialog, buttons);

@@ -164,3 +164,10 @@ test('the feasts file keeps whose day it is (person, kind), so the page can hide
   const file = JSON.parse(await w.h.db.prepare("SELECT body FROM published_revisions WHERE kind = 'bread' AND key = 'feasts/2027-06' AND live = 1").first('body'));
   assert.deepEqual([file.feasts[0].person, file.feasts[0].kind], ['abaskhiron', 'استشهاده']);
 });
+
+test('owner 2026-11-25: «من غير مصدر مكتوب» (source owner) for a day and an occasion of our own; anything else still needs https', () => {
+  const people = REG.people;
+  assert.deepEqual(checkOccasion({ id: 'bday', name: 'x', type: 'fathers', gregorian: '06-06', source: 'owner', headline: 'النهارده عيد ميلاد أبونا' }, { people }), []);
+  assert.equal(checkOccasion({ id: 'bday', name: 'x', gregorian: '06-06', source: 'facebook' }, { people }).length, 1);
+  assert.equal(checkOccasion({ id: 'bday', name: 'x', gregorian: '06-06' }, { people }).length, 1, 'empty: refused');
+});

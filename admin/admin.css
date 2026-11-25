@@ -16973,3 +16973,42 @@ html[data-mode="light"] .sa-viewbar { background: rgb(255 255 255 / .92); }
   .oca-modal .modal__actions { flex-wrap: wrap; }
 }
 .oca-row__head .p8-tag { flex: none; }
+
+/* ============================================================
+   DIALOGS (owner 2026-11-25): the page behind stays still, a click outside never closes one (a nudge instead), and a
+   form says what is missing in itself (A.modal validate) instead of closing
+   ============================================================ */
+html.has-modal, html.has-modal body { overflow: hidden; }
+.modal { overscroll-behavior: contain; }
+.modal.is-nudge { animation: modal-nudge .32s ease; }
+@keyframes modal-nudge { 0%, 100% { translate: 0 0; } 25% { translate: -6px 0; } 50% { translate: 6px 0; } 75% { translate: -3px 0; } }
+.modal__error { display: flex; align-items: flex-start; gap: 8px; margin: 12px 0 0; padding: 10px 14px; border-radius: 12px; font-size: .9rem; font-weight: 700; line-height: 1.7; color: rgb(var(--danger-rgb)); background: rgb(var(--danger-rgb) / .1); border: 1px solid rgb(var(--danger-rgb) / .35); }
+.modal__error[hidden] { display: none; }
+.modal .is-invalid, .modal .is-invalid.input { border-color: rgb(var(--danger-rgb)) !important; box-shadow: 0 0 0 3px rgb(var(--danger-rgb) / .18) !important; }
+@media (prefers-reduced-motion: reduce) { .modal.is-nudge { animation: none; } }
+
+/* P5 (owner 2026-11-25): the person found by typing, and «من غير مصدر مكتوب» */
+.sa-pp { position: relative; display: grid; gap: 8px; }
+.sa-pp__chosen { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 8px 12px; border: 1px solid var(--p-line-2); border-radius: 14px; background: rgb(10 33 64 / .35); color: var(--text); font: inherit; text-align: start; cursor: pointer; }
+.sa-pp__chosen:hover { border-color: rgb(var(--acc-rgb) / .55); }
+.sa-pp__chosen > svg { width: 18px; height: 18px; margin-inline-start: auto; color: var(--gold); flex: none; }
+.sa-pp__chosen .ycard__face, .sa-pp__item .ycard__face { width: 40px; height: 40px; flex: none; }
+.sa-pp__name { display: grid; gap: 2px; min-width: 0; }
+.sa-pp__name b { font-size: .95rem; line-height: 1.5; }
+.sa-pp__name small { font-size: .76rem; color: var(--text-3); line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sa-pp__none { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: rgb(var(--acc-rgb) / .1); color: var(--gold); font-weight: 800; }
+.sa-pp__search { position: relative; display: none; }
+.sa-pp.is-searching .sa-pp__search { display: block; }
+.sa-pp.is-searching .sa-pp__chosen { display: none; }
+.sa-pp__search > svg { position: absolute; inset-inline-start: 14px; top: 50%; translate: 0 -50%; width: 18px; height: 18px; color: var(--gold); pointer-events: none; }
+.sa-pp__search .input { padding-inline-start: 42px; min-height: 52px; border-radius: 14px; border-color: rgb(var(--acc-rgb) / .6); box-shadow: 0 0 0 3px rgb(var(--acc-rgb) / .15); }
+.sa-pp__list { position: absolute; z-index: 20; inset-inline: 0; top: calc(100% + 6px); max-height: 320px; overflow: auto; overscroll-behavior: contain; margin: 0; padding: 6px; list-style: none; border-radius: 16px; border: 1px solid rgb(var(--acc-rgb) / .45); background: #0a1a33; box-shadow: 0 22px 50px -18px rgb(0 0 0 / .85); isolation: isolate; }
+html[data-mode="light"] .sa-pp__list { background: #fffdf7; }
+.sa-pp__list[hidden] { display: none; }
+.sa-pp__item { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 12px; cursor: pointer; }
+.sa-pp__item:hover, .sa-pp__item.is-on { background: rgb(var(--acc-rgb) / .12); }
+.sa-pp__item.is-chosen b { color: var(--gold); }
+.sa-pp__item .chip { margin-inline-start: auto; flex: none; }
+.sa-pp__empty { padding: 14px; text-align: center; color: var(--text-3); }
+.sa-owner-src { margin-top: 8px; }
+.sa-owner-src input { width: 18px; height: 18px; accent-color: var(--gold); }

@@ -332,3 +332,48 @@ test('P5: the Primary Admin\'s switch «مناسبات كنيستنا على ا�
     await d.context.close();
   }
 });
+
+test('owner 2026-11-25: a dialog stays open on an outside click and says what is missing; «من غير مصدر مكتوب»; the person found by typing', async () => {
+  freshWorker();
+  const d = await open();
+  await go(d.page, 'breadoccasions');
+  await d.page.waitForSelector('[data-act="saints-newocc"]', { timeout: 8000 });
+  await d.page.click('[data-act="saints-newocc"]');
+  await d.page.waitForSelector('dialog .sa-pp');
+  assert.equal(await d.page.evaluate(() => document.documentElement.classList.contains('has-modal')), true, 'the page behind stays still');
+  // a click outside (on the backdrop): still open
+  await d.page.mouse.click(8, 450);
+  await sleep(400);
+  assert.ok(await d.page.$('dialog[open] .sa-pp'), 'not closed by a click outside');
+  // the person, by typing
+  await d.page.click('dialog .sa-pp__chosen');
+  await d.page.type('dialog .sa-pp__input', 'فيلوباتير');
+  await d.page.waitForSelector('dialog .sa-pp__item');
+  assert.ok(await d.page.$$eval('dialog .sa-pp__item', n => n.length) >= 1);
+  if (process.env.SAINTS_SHOTS) await d.page.screenshot({ path: SHOTS + '30-person-search-d.png' });   // (shot() blurs, and would close the list)
+  await d.page.keyboard.press('Enter');
+  assert.match(await d.page.$eval('dialog .sa-pp__chosen', n => n.textContent), /فيلوباتير/);
+  // save without a title: the dialog says so, and stays
+  await d.page.evaluate(() => [...document.querySelectorAll('dialog .modal__actions .btn')].pop().click());
+  await d.page.waitForSelector('dialog .modal__error:not([hidden])');
+  assert.match(await d.page.$eval('dialog .modal__error', n => n.textContent), /العنوان/);
+  assert.ok(await d.page.$('dialog [data-field="headline"].is-invalid'));
+  if (process.env.SAINTS_SHOTS) await d.page.screenshot({ path: SHOTS + '31-missing-d.png' });
+  // every year, no written source: refused with the reason, then «من غير مصدر مكتوب» saves it as 'owner'
+  await d.page.$eval('dialog [data-field="headline"]', i => { i.value = ''; });
+  await d.page.type('dialog [data-field="headline"]', 'النهارده عيد ميلاد أبونا فيلوباتير');
+  await d.page.evaluate(() => document.querySelectorAll('dialog .seg')[1].querySelectorAll('input')[1].click());
+  await d.page.evaluate(() => [...document.querySelectorAll('dialog .modal__actions .btn')].pop().click());
+  await d.page.waitForFunction(() => /المصدر/.test(document.querySelector('dialog .modal__error').textContent), { timeout: 5000 });
+  assert.ok(await d.page.$('dialog[open]'), 'still open, nothing lost');
+  await d.page.evaluate(() => document.querySelector('dialog [data-field="owner-source"]').click());
+  await d.page.evaluate(() => [...document.querySelectorAll('dialog .modal__actions .btn')].pop().click());
+  await d.page.waitForFunction(() => !document.querySelector('dialog[open] .sa-pp'), { timeout: 5000 });
+  await sleep(600);
+  const o = fake.state.saints.items.find(r => r.kind === 'occasion' && r.data.headline === 'النهارده عيد ميلاد أبونا فيلوباتير');
+  assert.ok(o, 'saved');
+  assert.equal(o.data.source, 'owner');
+  assert.equal(await d.page.evaluate(() => document.documentElement.classList.contains('has-modal')), false, 'the page scrolls again');
+  assert.deepEqual(d.problems, []);
+  await d.context.close();
+});

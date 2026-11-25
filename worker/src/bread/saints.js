@@ -71,7 +71,8 @@ function checkDay(f, e, { occasion = false } = {}) {
   if (!f || typeof f !== 'object') { e('يوم مش مفهوم.'); return; }
   if (!occasion && !text(f.kind, LIMITS.kind)) e('يوم من غير نوع (kind).');
   if (occasion && f.kind != null && !optText(f.kind, LIMITS.title)) e(`${who}: وصف المناسبة طويل.`);
-  if (typeof f.source !== 'string' || !URL_RE.test(f.source)) e(`${who}: المصدر لازم رابط https.`);
+  // a link, or 'owner' = «معلومة من الكنيسة أو شخصية، من غير مصدر مكتوب» (owner 2026-11-25: a father's birthday): no link on the site
+  if (f.source !== OWNER && (typeof f.source !== 'string' || !URL_RE.test(f.source))) e(`${who}: المصدر لازم رابط https، أو «من غير مصدر مكتوب».`);
   if (f.more != null && (!Array.isArray(f.more) || f.more.length > LIMITS.more)) e(`${who}: المصادر الزيادة لازم قايمة (لحد ${LIMITS.more}).`);
   for (const u of Array.isArray(f.more) ? f.more : []) if (typeof u !== 'string' || !URL_RE.test(u)) e(`${who}: رابط زيادة مش https.`);
   if (!optText(f.title, LIMITS.title) || !optText(f.note, LIMITS.note)) e(`${who}: العنوان أو الملحوظة طويلين.`);
@@ -185,7 +186,7 @@ export function checkOccasion(o, { people = null } = {}) {
     // P5: the day is a person's day in the registry (its date and source come from there)
     if (!linkOk(o.from, people)) e('«من يوم شخص»: الشخص أو اليوم مش موجود في السجل.');
     if (o.coptic != null || o.gregorian != null || o.date != null || o.repeat === 'once') e('«من يوم شخص»: التاريخ بييجي من السجل، من غير تاريخ تاني.');
-    if (o.source != null && (typeof o.source !== 'string' || !URL_RE.test(o.source))) e('المصدر لازم رابط https.');
+    if (o.source != null && o.source !== OWNER && (typeof o.source !== 'string' || !URL_RE.test(o.source))) e('المصدر لازم رابط https.');
     if (!optText(o.note, LIMITS.note)) e('الملحوظة طويلة.');
   } else checkDay(o, e, { occasion: true });
   if (o.type != null && !OCC_TYPES.includes(o.type)) e(`النوع لازم ${OCC_TYPES.join(' أو ')}.`);
