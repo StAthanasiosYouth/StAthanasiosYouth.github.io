@@ -80,7 +80,8 @@ function feastCard(h) {
   const ai = a && (a.type === 'ai' || a.type === 'art');
   const pic = a ? `<figure class="br-feast__fig"><span class="br-feast__pic"><img class="br-feast__img" src="${ROOT + a.media}" alt="${esc(h.p.name)}" loading="lazy" decoding="async">${ai ? '<span class="br-feast__ai">صورة تعبيرية</span>' : ''}</span></figure>` : '';
   const word = FEAST_WORDS[h.p.id] || 'كلمة السنكسار من «الأعياد».';
-  return `<section class="widget br-card br-feast" data-d="0"><h2 class="br-kicker">${bi('sun')}نحب نفكّرك</h2>${pic}<p class="br-feast__name">النهارده تذكار ${esc(h.p.name)}</p><p>${esc(word)}</p><p class="br-med__by br-med__src">من <a href="${esc(h.f.source)}" target="_blank" rel="noopener">${/st-takla\.org/.test(h.f.source) ? 'سنكسار موقع الأنبا تكلا' : 'المصدر'}</a></p></section>`;
+  const pope = /^(القديس )?البابا /.test(h.p.name);
+  return `<section class="widget br-card br-feast${pope ? ' br-feast--pope' : ''}" data-d="0"><h2 class="br-kicker">${bi('sun')}نحب نفكّرك${pope ? `<span class="br-feast__badge">${si('cross')}من بطاركة كنيستنا</span>` : ''}</h2>${pic}<p class="br-feast__name">النهارده تذكار ${esc(h.p.name)}</p><p>${esc(word)}</p><p class="br-med__by br-med__src">من <a href="${esc(h.f.source)}" target="_blank" rel="noopener">${/st-takla\.org/.test(h.f.source) ? 'سنكسار موقع الأنبا تكلا' : 'المصدر'}</a></p></section>`;
 }
 
 /* ---------- the «مناسبات كنيستنا» card ---------- */
@@ -137,7 +138,7 @@ function occasionCard(list, iso) {
   const src = o.source || (f && f.source);
   const kicker = patron
     ? `<span class="oc__crown">${si('cross')}شفيع كنيستنا</span><span class="oc__tag">مناسبات كنيستنا</span>`
-    : o.badge ? `<span class="oc__badge">${si(o.look === 'memorial' ? 'star' : 'church')}${esc(o.badge)}</span><span class="oc__tag">مناسبات كنيستنا</span>`
+    : o.badge ? `<span class="oc__badge">${si(o.look === 'memorial' ? 'star' : o.look === 'pope' ? 'cross' : 'church')}${esc(o.badge)}</span><span class="oc__tag">مناسبات كنيستنا</span>`
     : `<span class="oc__tag">${si(ICON[o.type])}مناسبات كنيستنا · ${esc(TYPE[o.type])}</span>`;
   const base = o.from && !patron ? byId(o.from.person).name : patron ? byId('mercurius').name : (o.people || []).length === 1 ? byId(o.people[0]).name : '';
   const who = base && o.honor ? o.honor + ' ' + base.replace(/^الأنبا /, 'الأنبا ') : base;
