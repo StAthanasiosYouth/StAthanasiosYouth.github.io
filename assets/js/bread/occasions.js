@@ -45,6 +45,25 @@ export function praiseOf(file, person, id) {
   return out.verses.length ? out : null;
 }
 
+/*
+ * P5b (owner 2026-11-25): the praise set for a season the day is in (seasons: coptic.js seasonsOn, narrowest first)
+ * → { season, person, name, praise } | null. A praise for the whole season (no days of its own) first.
+ */
+export function seasonPraise(file, seasons) {
+  const people = file && file.people && typeof file.people === 'object' ? file.people : {};
+  for (const season of seasons || []) {
+    const hits = [];
+    for (const [person, p] of Object.entries(people)) {
+      for (const q of (p && Array.isArray(p.praises) ? p.praises : [])) {
+        if (q && Array.isArray(q.seasons) && q.seasons.includes(season)) hits.push({ person, name: s(p.name, 120), q, wide: !(Array.isArray(q.days) && q.days.length) });
+      }
+    }
+    hits.sort((a, b) => b.wide - a.wide);
+    for (const h of hits) { const praise = praiseOf(file, h.person, h.q.id); if (praise) return { season, person: h.person, name: h.name, praise }; }
+  }
+  return null;
+}
+
 /* the published file → a safe copy, or null */
 export function cleanOccasions(file) {
   if (!file || typeof file !== 'object' || !Array.isArray(file.occasions)) return null;

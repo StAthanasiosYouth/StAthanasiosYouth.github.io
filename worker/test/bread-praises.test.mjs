@@ -135,3 +135,30 @@ test('publish: praises.json beside saints.json; the feasts tab gets the day\'s w
   assert.ok(day.praiseId);
   assert.ok(mary);
 });
+
+test('seasons (owner 2026-11-25): Coptic Easter, the seasons of a day, a praise set for a season wins only inside it; the admin\'s list is the Worker\'s', async () => {
+  const { easter, seasonsOn, SEASONS } = await import('../src/bread/coptic.js');
+  assert.deepEqual([2025, 2026, 2027, 2028, 2030].map(easter), ['2025-04-20', '2026-04-12', '2027-05-02', '2028-04-16', '2030-04-28']);
+  assert.deepEqual(seasonsOn('2026-11-25'), ['nativity-fast']);
+  assert.deepEqual(seasonsOn('2026-12-20'), ['kiahk', 'nativity-fast']);
+  assert.deepEqual(seasonsOn('2027-04-30'), ['holy-week', 'great-lent']);
+  assert.deepEqual(seasonsOn('2027-06-20'), ['pentecost50']);
+  assert.deepEqual(seasonsOn('2027-06-21'), ['apostles-fast']);
+  assert.deepEqual(seasonsOn('2027-08-10'), ['virgin-fast']);
+  assert.deepEqual(seasonsOn('2027-09-01'), []);
+  const p = person('mary');
+  const k = p.feasts[0].kind;
+  p.praises = [sung('pr1', { main: true }), sung('pr2', { seasons: ['kiahk'] }), sung('pr3', { seasons: ['virgin-fast'], days: [k] })];
+  assert.equal(praiseFor(p, 'غيره', '2026-12-20').id, 'pr2', 'in Kiahk');
+  assert.equal(praiseFor(p, 'غيره', '2027-09-01').id, 'pr1', 'out of it: the main one');
+  assert.equal(praiseFor(p, k, '2027-08-10').id, 'pr3', 'that day, in its season');
+  assert.equal(praiseFor(p, k, '2027-09-01').id, 'pr1', 'that day, out of its season');
+  const x = person('mary'); x.praises = [sung('pr1', { seasons: ['lent'] })];
+  assert.ok(ok(x).some(e => /فترة/.test(e)));
+  const admin = readFileSync(new URL('../../apps-script/AdminSaints.html', import.meta.url), 'utf8');
+  assert.ok(admin.includes('var PR_SEASONS = ' + JSON.stringify(SEASONS).replace(/","/g, '", "').replace(/\],\[/g, '], [').replace(/"/g, "'") + ';'));
+  // 0039: the Virgin's two
+  const { h } = await world();
+  const mary = JSON.parse(await h.db.prepare("SELECT data FROM saints_items WHERE kind = 'person' AND id = 'mary'").first('data'));
+  assert.deepEqual(mary.praises.filter(q => q.seasons).map(q => [q.title, q.seasons]), [['الصوم هو أول وصية', ['virgin-fast']], ['يا م ر ي م', ['kiahk']]]);
+});

@@ -18,7 +18,8 @@ import { stripTashkeel, agpeyaPsalm } from './text.js';
 import { parseRef, taklaUrl } from './refs.js';
 import { AR, cairoDay, programsOn, dayOf, dateText, clock, bareName, mmss, newSeed, SEED, dayDiff, feastOn, TAKLA_URL as TAKLA } from './model.js';
 import { loadIndex, loadDay, loadFeasts, loadOccasions, loadPraises, beacon, session, me, reflect, reflectEdit, reflectDelete, saveLook } from './api.js';
-import { occasionsOnDay, feastHidden, nextDate, cleanOccasions, praiseOf } from './occasions.js';
+import { occasionsOnDay, feastHidden, nextDate, cleanOccasions, praiseOf, seasonPraise } from './occasions.js';
+import { seasonsOn, SEASON_NAME } from './coptic.js';
 import { occasionCard, churchScreen, praiseSheet, viewerHtml, paintFrames, PRAISE_TYPE } from './occasions-view.js';
 import { readFace, RETURN_KEY, FROM_KEY } from '../account/link.js';
 import { soundEnabled, setSoundEnabled } from '../sound.js';
@@ -195,7 +196,7 @@ function occTop() {
 
 function feast() {
   const f = S.feast;
-  if (!f) return '';
+  if (!f) return seasonCard();
   // P5: a day «مناسبات كنيستنا» stands for is never repeated here
   if (S.occ && feastHidden(f, occToday())) return '';
   // one picture, lazy; an AI or painted one carries a small «صورة تعبيرية» (P4, owner 2026-11-24). Never a photographer's name.
@@ -363,6 +364,25 @@ function feastPraise(f) {
   if (!lines.length) return '';
   const link = !f.praiseId || q === 'none' ? `<p class="br-med__by"><a href="${esc(f.praise)}" target="_blank" rel="noopener">التمجيد كامل</a></p>` : '';
   return `<blockquote class="br-feast__praise"><p class="br-feast__praise-title">${esc(f.praiseTitle || 'من التمجيد')}</p><p class="br-feast__praise-text">${lines.map(esc).join('<br>')}</p>${link}</blockquote>`;
+}
+/*
+ * P5b (owner 2026-11-25): a day with no saint's card, in a season with a praise set for it (صوم العذراء، كيهك…):
+ * «نحب نفكّرك» carries that praise, whole. Read only on such a day (praises.json).
+ */
+function seasonCard() {
+  const z = S.season;
+  if (!z || (S.occ && occToday().length)) return '';
+  const q = z.praise;
+  const kind = [PRAISE_TYPE[q.type] || 'تمجيد', z.name].filter(Boolean).join(' · ');
+  const host = new URL(q.source).hostname.replace(/^www\./, '');
+  return `<section class="widget br-card br-feast br-feast--season" data-d="0"><h2 class="br-kicker">${bi('sun')}نحب نفكّرك</h2><p class="br-feast__name">إحنا في ${esc(SEASON_NAME[z.season])}</p><blockquote class="br-feast__praise br-feast__praise--full"><p class="br-feast__praise-title">${esc(q.title)}<small>${esc(kind)}</small></p>${q.verses.map(v => `<p class="br-feast__st">${v.map(esc).join('<br>')}${q.refrain ? `<br><span class="br-feast__ref">${esc(q.refrain)}</span>` : ''}</p>`).join('')}<p class="br-med__by">المصدر: <a href="${esc(q.source)}" target="_blank" rel="noopener">${esc(host)}</a></p></blockquote></section>`;
+}
+async function fillSeason() {
+  if (S.feast || S.season || !S.topic) return;
+  const seasons = seasonsOn(S.day);
+  if (!seasons.length) return;
+  S.season = seasonPraise(await loadPraises(), seasons);
+  if (S.season && S.view === 'today' && !app.querySelector('.br-feast')) render();
 }
 async function fillFeastPraise() {
   const f = S.feast;
@@ -814,6 +834,7 @@ async function boot() {
   S.view = S.topic ? 'today' : 'rest';
   render();
   fillFeastPraise();
+  fillSeason();
   if (location.hash === '#reflect') requestAnimationFrame(() => document.getElementById('reflect')?.scrollIntoView({ block: 'start' }));
   if (S.view === 'today') beacon(S.seed, 'open', S.day);
   loadReminders();

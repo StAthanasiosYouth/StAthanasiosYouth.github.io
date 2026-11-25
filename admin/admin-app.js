@@ -30662,6 +30662,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
    */
   var PR_TYPES = [['tamgeed', 'تمجيد'], ['madih', 'مديح'], ['tasbeha', 'تسبحة'], ['doxology', 'ذكصولوجية'], ['psali', 'إبصالية'], ['lahn', 'لحن']];
   var PR_TYPE = {}; PR_TYPES.forEach(function (t) { PR_TYPE[t[0]] = t[1]; });
+  // owner 2026-11-25: a whole season (the same list as worker/src/bread/coptic.js SEASONS; the Worker checks it)
+  var PR_SEASONS = [['kiahk', 'شهر كيهك'], ['nativity-fast', 'صوم الميلاد'], ['virgin-fast', 'صوم العذراء'], ['great-lent', 'الصوم الكبير'], ['holy-week', 'أسبوع الآلام'], ['pentecost50', 'الخماسين المقدسة'], ['apostles-fast', 'صوم الرسل']];
+  var PR_SEASON = {}; PR_SEASONS.forEach(function (t) { PR_SEASON[t[0]] = t[1]; });
   function confirmedOf(p) { return (p.praises || []).filter(function (q) { return q.status === 'confirmed' && q.verses && q.verses.length; }); }
   function hasPraise(p) { return !!p.praise || confirmedOf(p).length > 0; }
   function versesText(v) { return (v || []).map(function (x) { return x.join('\n'); }).join('\n\n'); }
@@ -30680,7 +30683,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         el('span', { class: 'sa-pr__main' },
           el('span', { class: 'sa-pr__tags' }, chip(PR_TYPE[q.type] || q.type, 'info'), q.status === 'confirmed' ? chip('مؤكد · بيظهر', 'ok') : chip('مرشح · مستني مراجعتك', 'warn'), q.main ? chip('الأساسي', 'gold') : null),
           el('b', { text: q.title }),
-          (q.days && q.days.length) || q.context ? el('small', { class: 'sa-pr__when', text: [(q.days || []).join('، '), q.context || ''].filter(Boolean).join(' · ') }) : null,
+          (q.days && q.days.length) || (q.seasons && q.seasons.length) || q.context ? el('small', { class: 'sa-pr__when', text: [(q.seasons || []).map(function (s) { return PR_SEASON[s] || s; }).join('، '), (q.days || []).join('، '), q.context || ''].filter(Boolean).join(' · ') }) : null,
           el('span', { class: 'sa-src' }, icon('link'), el('span', { text: host(q.source) + (q.verses && q.verses.length ? ' · ' + ar(q.verses.length) + ' مقطع' : ' · من غير نص لسه') }))),
         K.btn('عدّل', 'edit', 'btn--sm btn--ghost', { 'data-act': 'saints-praise', onclick: function () { praiseModal(i); } }));
     });
@@ -30714,7 +30717,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var main = el('input', { type: 'checkbox', checked: !!q.main });
     var kinds = []; p.feasts.forEach(function (f) { if (kinds.indexOf(f.kind) < 0) kinds.push(f.kind); });
     var days = kinds.map(function (k) { return el('label', { class: 'sa-check' }, el('input', { type: 'checkbox', value: k, checked: (q.days || []).indexOf(k) >= 0 }), el('span', { text: k })); });
-    var context = input(q.context, { placeholder: 'اختياري: تسبحة كيهك، سهرات العذراء، صوم الرسل…' });
+    var seasons = PR_SEASONS.map(function (s) { return el('label', { class: 'sa-check' }, el('input', { type: 'checkbox', value: s[0], checked: (q.seasons || []).indexOf(s[0]) >= 0 }), el('span', { text: s[1] })); });
+    var context = input(q.context, { placeholder: 'اختياري: سهرات العذراء، رفع البخور…' });
     var refrain = input(q.refrain, { placeholder: 'اختياري: المرد بعد كل مقطع' });
     var text = area_(versesText(q.verses), 10); text.setAttribute('data-field', 'verses');
     var body = el('div', { class: 'ba-dayform sa-dayform' },
@@ -30723,6 +30727,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       field('الحالة', seg('الحالة', [['candidate', 'مرشح (للإدارة بس)'], ['confirmed', 'مؤكد (بيظهر للشباب)']], status, function (v) { status = v; }), 'المرشح ميظهرش على الموقع لحد ما تأكده'),
       el('label', { class: 'sa-check' }, main, el('span', { text: 'التمجيد الأساسي للشخص (في كل أيامه اللي مالهاش تمجيد مخصص)' })),
       kinds.length ? el('div', { class: 'field' }, el('span', { class: 'field__label', text: 'مخصص لأيام' }), el('div', { class: 'sa-checks' }, days), el('span', { class: 'field__hint', text: 'اختياري: اليوم ده يظهر فيه التمجيد ده بدل الأساسي' })) : null,
+      el('div', { class: 'field' }, el('span', { class: 'field__label', text: 'مخصص لفترة' }), el('div', { class: 'sa-checks', 'data-field': 'seasons' }, seasons), el('span', { class: 'field__hint', text: 'اختياري: يظهر طول الفترة دي بس، كل يوم في «نحب نفكّرك» لو مفيش عيد، وفي أيام الشخص اللي جواها بدل الأساسي' })),
       field('المناسبة أو الطقس', context), field('المرد', refrain),
       field('النص', text, 'كل مقطع في فقرة، وسطر فاضي بين المقاطع. المؤكد لازم يبقى معاه النص'),
       i >= 0 ? el('div', {}, K.btn('شيل ده', 'trash', 'btn--sm btn--ghost sa-danger', { onclick: function (e) { p.praises.splice(i, 1); if (!p.praises.length) delete p.praises; e.target.closest('dialog').querySelector('.modal__actions .btn').click(); touched(); } })) : null);
@@ -30741,6 +30746,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       if (main.checked) v.main = true;
       var ds = days.map(function (d) { return d.firstChild; }).filter(function (c) { return c.checked; }).map(function (c) { return c.value; });
       if (ds.length) v.days = ds;
+      var ss = seasons.map(function (d) { return d.firstChild; }).filter(function (c) { return c.checked; }).map(function (c) { return c.value; });
+      if (ss.length) v.seasons = ss;
       if (context.value.trim()) v.context = context.value.trim();
       if (refrain.value.trim()) v.refrain = refrain.value.trim();
       var vs = readVerses(text.value);

@@ -56,3 +56,44 @@ export function daysOfMonth(ym) {
   }
   return out;
 }
+
+/*
+ * P5b (owner 2026-11-25): the church's seasons, for a praise chosen for a whole season (صوم العذراء، كيهك…).
+ * Coptic Easter: the Julian computus (Meeus), as a Gregorian date (JDN, so any century).
+ *   kiahk          شهر كيهك            1–30 كيهك
+ *   nativity-fast  صوم الميلاد          16 هاتور – 28 كيهك
+ *   virgin-fast    صوم العذراء          1–15 مسرى
+ *   great-lent     الصوم الكبير         55 days before Easter – the eve of Easter (Holy Week included)
+ *   holy-week      أسبوع الآلام         Palm Sunday – the eve of Easter
+ *   pentecost50    الخماسين المقدسة     Easter – Pentecost (50 days)
+ *   apostles-fast  صوم الرسل            the day after Pentecost – 4 أبيب
+ */
+export const SEASONS = [['kiahk', 'شهر كيهك'], ['nativity-fast', 'صوم الميلاد'], ['virgin-fast', 'صوم العذراء'], ['great-lent', 'الصوم الكبير'], ['holy-week', 'أسبوع الآلام'], ['pentecost50', 'الخماسين المقدسة'], ['apostles-fast', 'صوم الرسل']];
+export const SEASON_NAME = Object.fromEntries(SEASONS);
+
+/* Coptic (Orthodox) Easter of a Gregorian year → 'YYYY-MM-DD' */
+export function easter(y) {
+  const a = y % 4, b = y % 7, c = y % 19, d = (19 * c + 15) % 30, e = (2 * a + 4 * b - d + 34) % 7;
+  const n = d + e + 114, m = Math.floor(n / 31), day = (n % 31) + 1;
+  // that date is Julian: its Julian Day Number, read back in the Gregorian calendar
+  const aa = Math.floor((14 - m) / 12), yy = y + 4800 - aa, mm = m + 12 * aa - 3;
+  const g = gregorianOfJdn(day + Math.floor((153 * mm + 2) / 5) + 365 * yy + Math.floor(yy / 4) - 32083);
+  return `${g.y}-${String(g.m).padStart(2, '0')}-${String(g.d).padStart(2, '0')}`;
+}
+
+/* 'YYYY-MM-DD' → the seasons that day is in, the narrowest first (أسبوع الآلام before الصوم الكبير) */
+export function seasonsOn(iso) {
+  const c = toCoptic(iso), at = c.m * 100 + c.d, out = [];
+  const [gy, gm, gd] = iso.split('-').map(Number);
+  const j = jdnOfGregorian(gy, gm, gd);
+  const [ey, em, ed] = easter(gy).split('-').map(Number);
+  const k = j - jdnOfGregorian(ey, em, ed);   // days from Easter
+  if (k >= -7 && k <= -1) out.push('holy-week');
+  if (k >= -55 && k <= -1) out.push('great-lent');
+  if (k >= 0 && k <= 49) out.push('pentecost50');
+  if (k >= 50 && at >= 900 && at <= 1104) out.push('apostles-fast');
+  if (at >= 1201 && at <= 1215) out.push('virgin-fast');
+  if (c.m === 4) out.push('kiahk');
+  if (at >= 316 && at <= 428) out.push('nativity-fast');
+  return out;
+}

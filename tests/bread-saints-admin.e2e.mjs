@@ -399,7 +399,7 @@ test('P5b «التماجيد والمدائح»: several per person, «مؤكد�
   await d.page.waitForSelector('dialog .modal__error', { timeout: 4000 });
   assert.match(await d.page.$eval('dialog .modal__error', n => n.textContent), /النص/);
   await d.page.type('dialog [data-field="verses"]', 'السطر الأول\nالسطر التاني\n\nالمقطع التاني');
-  await d.page.evaluate(() => { document.querySelectorAll('dialog .sa-checks input')[1].click(); });
+  await d.page.evaluate(() => { document.querySelectorAll('dialog .sa-checks input')[1].click(); document.querySelector('dialog [data-field="seasons"] input[value="virgin-fast"]').click(); });
   await d.page.evaluate(() => [...document.querySelectorAll('dialog .modal__actions .btn')].pop().click());
   await d.page.waitForFunction(() => document.querySelectorAll('.sa-pr').length > 0 && !document.querySelector('dialog[open] [data-field="verses"]'), { timeout: 5000 });
   await d.page.click('[data-act="saints-save"]');
@@ -408,6 +408,7 @@ test('P5b «التماجيد والمدائح»: several per person, «مؤكد�
   const q = g.praises.find(x => x.title === 'ذكصولوجية مار جرجس');
   assert.deepEqual([q.type, q.status, q.verses], ['doxology', 'confirmed', [['السطر الأول', 'السطر التاني'], ['المقطع التاني']]]);
   assert.deepEqual(q.days, [g.feasts[1].kind]);
+  assert.deepEqual(q.seasons, ['virgin-fast']);
   assert.ok(g.praises.some(x => x.main && /جاورجيوس/.test(x.title)), 'the main one stays');
   // a day's «نحب نفكّرك» words: shown in its dialog, and kept on save
   g.feasts[1].word = 'كلام اليوم';

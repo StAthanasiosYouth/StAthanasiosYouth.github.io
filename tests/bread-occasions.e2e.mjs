@@ -187,3 +187,20 @@ test('P5b: a saint\'s day praise shows whole in «نحب نفكّرك» (owner: 
   assert.deepEqual(errors, []);
   await ctx.close();
 });
+
+test('P5b seasons: a Kiahk day with no saint\'s card → «نحب نفكّرك» carries «يا م ر ي م» whole; a day in no season → nothing', async () => {
+  let { page, ctx, errors } = await open('2026-12-20');
+  await page.waitForSelector('.br-feast--season .br-feast__st', { timeout: 10000 });
+  assert.match(await text(page, '.br-feast--season'), /كيهك/);
+  assert.match(await text(page, '.br-feast--season .br-feast__praise-title'), /م ر ي م/);
+  assert.ok((await page.$$('.br-feast--season .br-feast__st')).length >= 10);
+  assert.equal(await noScroll(page), 0);
+  if (process.env.SAINTS_SHOTS) { await page.$eval('.br-feast--season', n => n.scrollIntoView()); await sleep(400); await page.screenshot({ path: '../docs/daily-bread/saints/p5/shots/p5b-season-kiahk-m.png' }); }
+  assert.deepEqual(errors, []);
+  await ctx.close();
+  ({ page, ctx, errors } = await open('2027-09-01'));
+  await sleep(1500);
+  assert.equal(await page.$('.br-feast--season'), null);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});

@@ -332,7 +332,7 @@ export async function adminSaintsFeasts(ctx) {
     const p = sungAll[hit.person.id] ? { ...hit.person, praises: sungAll[hit.person.id].praises.map(q => ({ ...q, status: 'confirmed' })) } : { ...hit.person, praises: [] };
     // P4: the album's picture for this day (pictureFor), else the old St-Takla copy
     const pic = pictureFor(p, f.kind, hit.date.slice(0, 4));
-    const sang = praiseFor(p, f.kind);
+    const sang = praiseFor(p, f.kind, hit.date);
     return {
       date: hit.date, on: true, id: p.id, name: p.name, kind: f.kind, title: (f.title || (f.kind + ' ' + p.name)).slice(0, 120),
       // P5b: the day's own words (written for «نحب نفكّرك») first

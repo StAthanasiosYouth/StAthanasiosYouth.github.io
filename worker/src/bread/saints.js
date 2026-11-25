@@ -32,7 +32,8 @@
  *   candidate = in the admin only, never on the site; confirmed needs its text. The legacy `praise` stays the card's
  *   praise until a confirmed one exists (nothing is replaced before the owner confirms).
  */
-import { daysOfMonth, monthDays, toCoptic } from './coptic.js';
+import { daysOfMonth, monthDays, toCoptic, seasonsOn, SEASONS } from './coptic.js';
+const SEASON_IDS = SEASONS.map(s => s[0]);
 
 export const CLASSES = ['reposed', 'living'];
 export const MISSABLE = ['feasts', 'album'];
@@ -172,6 +173,8 @@ export function checkPerson(p, { cats = {}, imageExists = null, pictureExists = 
       if (!PRAISE_STATUS.includes(q.status)) e(w + ': الحالة لازم مؤكد أو مرشح.');
       if (q.main != null && typeof q.main !== 'boolean') e(w + ': «الأساسي» لازم آه أو لأ.');
       if (q.days != null && (!Array.isArray(q.days) || !q.days.every(k => kinds.has(k)))) e(w + ': أيام مش موجودة عند الشخص.');
+      // owner 2026-11-25: a whole season (صوم العذراء، كيهك…), coptic.js SEASONS
+      if (q.seasons != null && (!Array.isArray(q.seasons) || q.seasons.length > SEASON_IDS.length || !q.seasons.every(s => SEASON_IDS.includes(s)))) e(w + ': فترة مش معروفة.');
       if (!optText(q.context, LIMITS.title) || !optText(q.opening, LIMITS.line) || !optText(q.author, LIMITS.name) || !optText(q.refrain, LIMITS.line) || !optText(q.note, LIMITS.note)) e(w + ': خانة طويلة.');
       if (q.verses != null) {
         const ok = Array.isArray(q.verses) && q.verses.length <= LIMITS.verses && q.verses.every(v => Array.isArray(v) && v.length > 0 && v.length <= LIMITS.verse && v.every(l => text(l, LIMITS.line)));
@@ -464,12 +467,18 @@ export function occasionsFile(reg) {
 /* the confirmed praises of a person (with their text): the only ones the site ever shows */
 export const confirmedPraises = p => (Array.isArray(p && p.praises) ? p.praises : []).filter(q => q && q.status === 'confirmed' && Array.isArray(q.verses) && q.verses.length);
 /*
- * The praise of one of a person's days: a confirmed one set for that day first, then the main one, then the only one
- * with no days of its own; none → null (the card keeps the legacy excerpt, if any, as before).
+ * The praise of one of a person's days (iso: that day's date, for the seasons). A praise set for a season shows only in
+ * it. In order: set for that day and in its season · set for that day · set for the season now · the main one · the
+ * only one with nothing set; none → null (the card keeps the legacy excerpt, if any, as before).
  */
-export function praiseFor(p, kind) {
-  const list = confirmedPraises(p);
-  return list.find(q => Array.isArray(q.days) && q.days.includes(kind)) || list.find(q => q.main) || (list.length === 1 && !(list[0].days && list[0].days.length) ? list[0] : null);
+export function praiseFor(p, kind, iso) {
+  const now = new Set(iso ? seasonsOn(iso) : []);
+  const has = (q, k) => Array.isArray(q[k]) && q[k].length > 0;
+  const seasonal = q => has(q, 'seasons') && q.seasons.some(s => now.has(s));
+  const forDay = q => has(q, 'days') && q.days.includes(kind);
+  const list = confirmedPraises(p).filter(q => !has(q, 'seasons') || seasonal(q));
+  return list.find(q => forDay(q) && seasonal(q)) || list.find(forDay) || list.find(q => seasonal(q) && !has(q, 'days')) || list.find(q => q.main)
+    || (list.length === 1 && !has(list[0], 'days') ? list[0] : null);
 }
 /* the card's short teaser of a praise: its first verse (and its response) */
 export const praiseTeaser = q => [...q.verses[0], ...(q.refrain ? [q.refrain] : [])].join('\n');
@@ -480,7 +489,7 @@ export function praisesFile(reg) {
   for (const p of reg.people || []) {
     const list = confirmedPraises(p).map(q => {
       const x = { id: q.id, type: q.type, title: q.title, source: q.source };
-      for (const k of ['main', 'days', 'context', 'author', 'refrain']) if (q[k] != null) x[k] = q[k];
+      for (const k of ['main', 'days', 'seasons', 'context', 'author', 'refrain']) if (q[k] != null) x[k] = q[k];
       x.verses = q.verses;
       return x;
     });
