@@ -1294,3 +1294,37 @@ html[data-look="dawn"] .oc.oc--bishop, html[data-look="dawn"] .oc.oc--memorial {
   .ch-family { --oc-seal: 84px; padding: 16px; gap: 14px; }
   .ch-family .oc__days { grid-template-columns: 1fr; }
 }
+
+/* ---------- owner 2026-11-25 (approved): the «كنيستنا» tab, a calm empty state + «مناسباتنا الجاية» ---------- */
+.ch-empty { display: grid; justify-items: center; gap: 8px; padding: 30px 22px 26px; text-align: center; }
+.ch-empty__seal { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; color: var(--gold-hi); background: radial-gradient(circle at 50% 35%, rgba(var(--gold-hi-rgb), .22), rgba(110, 31, 36, .35)); border: 1px solid rgba(var(--gold-hi-rgb), .35); box-shadow: 0 10px 26px -12px rgba(0, 0, 0, .8); }
+.ch-empty__seal .icon { width: 30px; height: 30px; }
+.ch-empty__title { margin: 6px 0 0; font-family: var(--font-display); font-weight: 400; font-size: 1.35rem; color: #ffe9b8; }
+.ch-empty__text { margin: 0; max-width: 34ch; color: var(--text-2); line-height: 1.9; font-size: .95rem; }
+.ch-next { width: 100%; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 12px 14px; border-radius: 20px; border: 1px solid rgba(var(--gold-hi-rgb), .3); background: linear-gradient(100deg, rgba(110, 31, 36, .42), rgba(255, 255, 255, .03)); color: var(--text); font: inherit; text-align: start; cursor: pointer; }
+.ch-next:hover { border-color: rgba(var(--gold-hi-rgb), .6); }
+.ch-next__pic { --oc-arch-w: 52px; cursor: inherit; }
+.ch-next__main { display: grid; gap: 2px; min-width: 0; }
+.ch-next__main b { font-size: 1.02rem; color: #ffe9b8; }
+.ch-next__main small { color: var(--text-2); font-size: .82rem; }
+.ch-next__k { display: inline-flex; align-items: center; gap: 6px; color: var(--gold) !important; font-weight: 800; letter-spacing: .01em; }
+.ch-next__k .icon { width: 15px; height: 15px; }
+.ch-next__go { color: var(--gold); display: grid; place-items: center; transform: rotate(90deg); }
+.ch-next__go .icon { width: 20px; height: 20px; }
+.ch-nextsheet { width: min(560px, calc(100vw - 24px)); padding: 22px 18px 18px; }
+.ch-nextsheet__h { display: flex; align-items: center; gap: 8px; margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 1.4rem; color: #ffe9b8; }
+.ch-nextsheet__h .icon { width: 22px; height: 22px; color: var(--gold); }
+.ch-nextsheet__sub { margin: 2px 0 14px; color: var(--text-3); font-size: .85rem; }
+.ch-nxs { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.ch-nx { width: 100%; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 10px 12px; border-radius: 18px; border: 1px solid rgba(var(--gold-hi-rgb), .16); background: rgba(255, 255, 255, .035); color: var(--text); font: inherit; text-align: start; cursor: pointer; }
+.ch-nx:hover { border-color: rgba(var(--gold-hi-rgb), .45); }
+.ch-nx--patron { border-color: rgba(var(--gold-hi-rgb), .45); background: linear-gradient(90deg, rgba(110, 31, 36, .35), rgba(110, 31, 36, .08)); }
+.ch-nx__pic { --oc-arch-w: 58px; cursor: inherit; }
+.ch-nx__main { display: grid; gap: 2px; min-width: 0; }
+.ch-nx__main b { font-size: 1rem; color: #ffe9b8; line-height: 1.5; }
+.ch-nx__main small { color: var(--text-2); font-size: .8rem; }
+.ch-nx__date { color: var(--text-3) !important; }
+.ch-nx__left { display: grid; justify-items: center; min-width: 52px; padding: 6px 8px; border-radius: 14px; background: rgba(0, 0, 0, .22); border: 1px solid rgba(var(--gold-hi-rgb), .16); line-height: 1.1; }
+.ch-nx__left b { font-family: var(--font-display); font-weight: 400; font-size: 1.55rem; color: var(--gold-hi); }
+.ch-nx__left small { font-size: .7rem; color: var(--text-3); }
+.ch-nx__left.is-near { background: rgba(110, 31, 36, .55); border-color: rgba(var(--gold-hi-rgb), .4); }

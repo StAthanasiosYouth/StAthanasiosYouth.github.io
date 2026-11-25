@@ -113,34 +113,44 @@ export function viewerHtml(ps, at) {
 /* the «كنيستنا» tab */
 const soon = n => (n === 0 ? 'النهارده' : n === 1 ? 'بكره' : n < 11 ? `بعد ${AR(n)} أيام` : `بعد ${AR(n)} يوم`);
 const between = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 864e5);
-function patronBox(p, kind) {
-  if (!p) return '';
-  if (kind === 'family') {
-    return `<section class="ch-family"><span class="oc-seal ch-family__pic" aria-hidden="true"><img src="${esc(p.img || '')}" alt=""${frame(p)}>${p.ai ? '<span class="oc-arch__ai">صورة تعبيرية</span>' : ''}</span>
-      <div class="ch-family__body"><p class="oc__kicker"><span class="oc__family">${si('book')}شفيع أسرتنا</span></p><h2 class="oc__title">${esc(p.name)}</h2>${patronDays(p, TODAY.iso)}${p.praise && p.praise.verses.length ? `<button class="oc__praise-go" type="button" data-praise="${esc(p.id)}">${bi('reading')}اقرا التمجيد كامل <small>${AR(p.praise.verses.length)} مقطع</small></button>` : ''}</div></section>`;
-  }
-  return `<section class="ch-patron"><span class="oc-arch ch-patron__pic" aria-hidden="true"><img src="${esc(p.img || '')}" alt=""${frame(p)}>${p.ai ? '<span class="oc-arch__ai">صورة تعبيرية</span>' : ''}</span>
-    <div class="ch-patron__body"><p class="oc__kicker"><span class="oc__crown">${si('cross')}شفيع كنيستنا</span></p><h2 class="oc__title">${esc(p.name)}</h2>
-    ${patronDays(p, TODAY.iso)}${p.praise && p.praise.verses.length ? `<button class="oc__praise-go" type="button" data-praise="${esc(p.id)}">${bi('reading')}اقرا التمجيد كامل <small>${AR(p.praise.verses.length)} مقطع</small></button>` : ''}</div></section>`;
-}
 const TODAY = { iso: '' };
+/*
+ * The «كنيستنا» tab (owner 2026-11-25, approved): today's card, or a calm empty state; then «مناسباتنا الجاية», a
+ * small card with the nearest one, that opens the nearest few. No archive, no history (that is «حول كنيستنا», P7).
+ */
+export const NEXT_N = 4;
+const left = n => (n === 1 ? 'بكره' : n === 2 ? 'بعد يومين' : n < 11 ? `فاضل ${AR(n)} أيام` : `فاضل ${AR(n)} يوم`);
+const nextOf = (file, iso) => upcoming(file, iso).filter(x => x.at !== iso).slice(0, NEXT_N);
+const picOf = o => (o.type === 'family' && TODAY.fam ? TODAY.fam : o.pictures[0]);
 export function churchScreen(file, iso, { todayCard }) {
-  TODAY.iso = iso;
-  const today = file.occasions.filter(o => isOn(o, iso));
-  let month = '';
-  const rows = upcoming(file, iso).filter(x => x.at !== iso).map(({ o, at }) => {
-    const p = o.pictures[0]; const n = between(iso, at); const ym = at.slice(0, 7);
-    const head = ym !== month ? `<li class="ch-month">${GM[+at.slice(5, 7) - 1]} ${AR(at.slice(0, 4))}</li>` : ''; month = ym;
-    return head + `<li><button class="ch-row${o.type === 'patron' ? ' ch-row--patron' : ''}${o.type === 'family' ? ' ch-row--family' : ''}${o.look ? ' ch-row--' + o.look : ''}" type="button" data-open="${esc(o.id)}" data-at="${at}">
-      <span class="ch-row__date"><b>${AR(+at.slice(8))}</b><small>${GM[+at.slice(5, 7) - 1]}</small></span>
-      ${p ? `<span class="oc-arch ch-row__pic"><img src="${esc(p.img)}" alt=""${frame(p)} loading="lazy"></span>` : ''}
-      <span class="ch-row__main"><b>${esc(o.headline.replace(/^النهارده /, ''))}</b>${o.who ? `<small>${esc(o.who)}</small>` : ''}<small class="ch-row__cop">${esc(copticDay(at, AR))}${file.types[o.type] ? ' · ' + esc(file.types[o.type]) : ''}</small></span>
-      <span class="ch-row__soon${n <= 7 ? ' is-near' : ''}">${soon(n)}</span></button></li>`;
-  }).join('');
+  TODAY.iso = iso; TODAY.fam = file.patrons.family && file.patrons.family.img ? file.patrons.family : null;
+  const today = todayCard
+    ? `<h2 class="ch-h">${bi('sun')}النهارده</h2>${todayCard}`
+    : `<section class="widget br-card ch-empty"><span class="ch-empty__seal" aria-hidden="true">${si('church')}</span>
+        <h2 class="ch-empty__title">مفيش مناسبات خاصة بكنيستنا النهارده</h2>
+        <p class="ch-empty__text">أول ما ييجي عيد لشفيع كنيستنا أو أسرتنا، أو مناسبة لإيبارشيتنا وآبائنا، هتلاقيها هنا في أول اليوم.</p></section>`;
+  const first = nextOf(file, iso)[0];
+  const p = first && picOf(first.o);
+  const next = first ? `<button class="ch-next" type="button" data-next>
+      ${p ? `<span class="oc-arch ch-next__pic"><img src="${esc(p.img)}" alt=""${frame(p)}></span>` : ''}
+      <span class="ch-next__main"><small class="ch-next__k">${si('calendar')}مناسباتنا الجاية</small><b>${esc(first.o.headline.replace(/^النهارده /, ''))}</b><small>${esc(dayLine(first.at))} · ${left(between(iso, first.at))}</small></span>
+      <span class="ch-next__go">${si('chevron')}</span></button>` : '';
   return `<main id="main" class="br-sheet-page ch">
-    <div class="br-h1"><span class="br-remind__ic">${si('church')}</span><div><h1>كنيستنا</h1><p>أعياد شفيع كنيستنا وشفيع أسرتنا، ومناسبات إيبارشيتنا وآبائنا، وكل اللي جاي.</p></div></div>
-    ${today.some(o => o.type === 'patron') ? '' : patronBox(file.patrons.patron, 'patron')}${today.some(o => o.type === 'family') ? '' : patronBox(file.patrons.family, 'family')}
-    ${today.length ? `<h2 class="ch-h">${bi('sun')}النهارده</h2>${todayCard}` : ''}
-    <section class="widget br-card ch-soon"><h2 class="br-kicker">${si('calendar')}الجاي</h2>${rows ? `<ol class="ch-list">${rows}</ol>` : '<p class="br-keep">مفيش مناسبات جاية.</p>'}</section>
+    <div class="br-h1"><span class="br-remind__ic">${si('church')}</span><div><h1>كنيستنا</h1><p>مناسبات كنيستنا وإيبارشيتنا وآبائنا، في يومها.</p></div></div>
+    ${today}${next}
   </main>`;
+}
+/* «مناسباتنا الجاية»: the nearest few, each with its picture, its day (Gregorian and Coptic) and the days left */
+export function nextSheet(file, iso) {
+  const rows = nextOf(file, iso).map(({ o, at }) => {
+    const p = picOf(o); const n = between(iso, at);
+    return `<li><button class="ch-nx${o.type === 'patron' ? ' ch-nx--patron' : ''}" type="button" data-open="${esc(o.id)}" data-at="${at}">
+      <span class="oc-arch ch-nx__pic">${p ? `<img src="${esc(p.img)}" alt=""${frame(p)} loading="lazy">` : ''}</span>
+      <span class="ch-nx__main"><b>${esc(o.headline.replace(/^النهارده /, ''))}</b>${o.who ? `<small>${esc(o.who)}</small>` : ''}
+        <small class="ch-nx__date">${esc(dayLine(at))}</small></span>
+      <span class="ch-nx__left${n <= 7 ? ' is-near' : ''}"><b>${AR(n)}</b><small>${n < 11 && n !== 1 ? 'أيام' : 'يوم'}</small></span></button></li>`;
+  }).join('');
+  return `<button class="oc-view__btn ch-sheet__x" type="button" data-sheet-close aria-label="اقفل">${si('close')}</button>
+    <h2 class="ch-nextsheet__h">${si('calendar')}مناسباتنا الجاية</h2><p class="ch-nextsheet__sub">أقرب المناسبات اللي تخص كنيستنا</p>
+    ${rows ? `<ol class="ch-nxs">${rows}</ol>` : '<p class="br-keep">مفيش مناسبات جاية.</p>'}`;
 }

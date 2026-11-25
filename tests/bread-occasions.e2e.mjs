@@ -124,26 +124,36 @@ test('14 June: «عيد إيبارشيتنا» stands for Anba Theophilus\'s ord
   await ctx.close();
 });
 
-test('the «كنيستنا» tab (phone): our patrons, what is coming by month, a tap opens that day\'s card', async () => {
-  const { page, ctx, errors } = await open('2026-11-25');
+test('the «كنيستنا» tab (phone, owner 2026-11-25): no occasion today → a calm empty state + «مناسباتنا الجاية» (the nearest 4); a tap opens that day\'s card; no archive', async () => {
+  let { page, ctx, errors } = await open('2026-11-25');
   await page.waitForSelector('.tabbar [data-tab="church"]');
   assert.equal(await page.$$eval('.tabbar__slots .tabbar__tab', n => n.length), 4, 'النهارده · كنيستنا · إعداداتي · الموقع');
   await page.click('.tabbar [data-tab="church"]');
   await page.waitForSelector('.ch');
   assert.ok(page.url().includes('s=church'));
-  assert.ok(await page.$('.ch-patron'));
-  assert.ok(await page.$('.ch-family'), 'Pope Athanasius, our family\'s patron');
-  const first = await text(page, '.ch-row');
-  assert.match(first, /عيد استشهاد شفيع كنيستنا/);
-  assert.match(first, /بعد ٩ أيام/);
-  assert.ok(await page.$$eval('.ch-month', n => n.length) >= 6);
-  await page.click('.ch-row[data-open="redseadiocese"]');
-  await page.waitForSelector('dialog.ch-sheet[open] .oc');
-  assert.match(await text(page, 'dialog.ch-sheet .oc__title'), /^عيد إيبارشيتنا/, 'no «النهارده» on another day');
+  assert.match(await text(page, '.ch-empty'), /مفيش مناسبات خاصة بكنيستنا النهارده/);
+  assert.equal(await page.$('.ch-patron, .ch-family, .ch-month, .ch-row'), null, 'no patron boxes, no list by month');
+  assert.match(await text(page, '.ch-next'), /عيد استشهاد شفيع كنيستنا.*فاضل ٩ أيام/);
+  if (process.env.SAINTS_SHOTS) { await sleep(300); await page.screenshot({ path: '../docs/daily-bread/saints/p5/shots/p5-church-empty-built-m.png' }); }
+  await page.click('[data-next]');
+  await page.waitForSelector('dialog.ch-nextsheet[open] .ch-nx');
+  assert.equal(await page.$$eval('dialog.ch-nextsheet .ch-nx', n => n.length), 4);
+  assert.match(await text(page, 'dialog.ch-nextsheet .ch-nx__left'), /^٩/);
+  if (process.env.SAINTS_SHOTS) { await sleep(400); await page.screenshot({ path: '../docs/daily-bread/saints/p5/shots/p5-church-next-built-m.png' }); }
+  await page.click('dialog.ch-nextsheet .ch-nx[data-open="abusefeinmartyrdom"]');
+  await page.waitForSelector('dialog.ch-sheet:not(.ch-nextsheet)[open] .oc');
+  assert.match(await text(page, 'dialog.ch-sheet .oc__title'), /عيد استشهاد شفيع كنيستنا/);
   await page.click('[data-sheet-close]');
   assert.ok(await noScroll(page) <= 1);
   await page.goBack();
   await page.waitForSelector('.br-dawn');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+  // a day with an occasion: its card, and «مناسباتنا الجاية» under it
+  ({ page, ctx, errors } = await open('2026-12-04', { path: '/daily-bread/?s=church' }));
+  await page.waitForSelector('.ch .oc');
+  assert.equal(await page.$('.ch-empty'), null);
+  assert.ok(await page.$('.ch-next'));
   assert.deepEqual(errors, []);
   await ctx.close();
 });

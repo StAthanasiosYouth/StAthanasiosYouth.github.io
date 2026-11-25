@@ -20,7 +20,7 @@ import { AR, cairoDay, programsOn, dayOf, dateText, clock, bareName, mmss, newSe
 import { loadIndex, loadDay, loadFeasts, loadOccasions, loadPraises, beacon, session, me, reflect, reflectEdit, reflectDelete, saveLook } from './api.js';
 import { occasionsOnDay, feastHidden, nextDate, cleanOccasions, praiseOf, seasonPraise } from './occasions.js';
 import { seasonsOn, SEASON_NAME } from './coptic.js';
-import { occasionCard, churchScreen, praiseSheet, viewerHtml, paintFrames, PRAISE_TYPE } from './occasions-view.js';
+import { occasionCard, churchScreen, nextSheet, praiseSheet, viewerHtml, paintFrames, PRAISE_TYPE } from './occasions-view.js';
 import { readFace, RETURN_KEY, FROM_KEY } from '../account/link.js';
 import { soundEnabled, setSoundEnabled } from '../sound.js';
 
@@ -391,6 +391,16 @@ async function fillFeastPraise() {
   const old = app.querySelector('.br-feast .br-feast__praise');
   if (old) old.outerHTML = feastPraise(f);
 }
+/* «مناسباتنا الجاية» (owner 2026-11-25): the nearest few; a tap opens that day's card */
+function openNext() {
+  if (!S.occ) return;
+  const d = dialog('ch-sheet', 'مناسباتنا الجاية', nextSheet(S.occ, S.day));
+  d.classList.add('ch-nextsheet');
+  d.addEventListener('click', e => {
+    const op = e.target.closest('[data-open]'); if (op) { d.close(); openOccasion(op.dataset.open, op.dataset.at); return; }
+    if (e.target === d || e.target.closest('[data-sheet-close]')) d.close();
+  });
+}
 function openOccasion(id, at) {
   const o = S.occ && S.occ.occasions.find(x => x.id === id);
   if (!o) return;
@@ -714,6 +724,7 @@ app.addEventListener('click', e => {
   if (pr) { openPraise(pr.dataset.praise); return; }
   const op = e.target.closest('[data-open]');
   if (op) { openOccasion(op.dataset.open, op.dataset.at); return; }
+  if (e.target.closest('[data-next]')) { openNext(); return; }
   if (e.target.matches('.br-add__time')) { try { e.target.showPicker(); } catch { /* the field itself still works */ } return; }
   const a = e.target.closest('[data-act]');
   if (!a || a.matches('input')) return;
