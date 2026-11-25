@@ -1814,7 +1814,9 @@
           setrow('«خبزنا اليومي» على الموقع', s.module ? 'مفتوح للشباب' : 'بيتفتح يوم الإطلاق (W7)، بعد تجربة Staging', el('span', { class: 'chip ' + (s.module ? 'chip--ok' : 'chip--off'), text: s.module ? 'مفتوح' : 'مقفول' })),
           setrow('الكارت في الرئيسية واللينك في القايمة', '/daily-bread/', el('span', { class: 'chip ' + (s.module ? 'chip--ok' : 'chip--off'), text: s.module ? 'ظاهرين' : 'مع فتح القسم' })),
           // P3: the saints registry in the admin (BREAD_SAINTS), the Primary Admin's switch
-          setrow('سجل الشخصيات في الأدمن', s.saints ? '«الشخصيات» و«المناسبات» مفتوحين' : 'مقفول: التبويبين مش ظاهرين', sw(!!s.saints, 'سجل الشخصيات', function (event) { saveSetting({ saints: event.target.checked }, event.target); }, !(A.access && A.access.primary)), { 'data-act': 'bread-saints-switch' })
+          setrow('سجل الشخصيات في الأدمن', s.saints ? '«الشخصيات» و«المناسبات» مفتوحين' : 'مقفول: التبويبين مش ظاهرين', sw(!!s.saints, 'سجل الشخصيات', function (event) { saveSetting({ saints: event.target.checked }, event.target); }, !(A.access && A.access.primary)), { 'data-act': 'bread-saints-switch' }),
+          // P5: «مناسبات كنيستنا» on the member page (BREAD_OCCASIONS), the Primary Admin's switch; the card shows what «راجع وانشر» published
+          setrow('مناسبات كنيستنا على الموقع', s.occasions ? 'الكارت فوق أول اليوم وتبويب «كنيستنا» ظاهرين للشباب' : 'مقفول: مفيش كارت ولا تبويب «كنيستنا». جهّز وراجع في «المناسبات» الأول', sw(!!s.occasions, 'مناسبات كنيستنا', function (event) { saveSetting({ occasions: event.target.checked }, event.target); }, !(A.access && A.access.primary)), { 'data-act': 'bread-occasions-switch' })
         ]))));
     return [r];
   };

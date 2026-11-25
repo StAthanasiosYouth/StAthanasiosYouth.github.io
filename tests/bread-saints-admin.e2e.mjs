@@ -316,3 +316,19 @@ test('P5 «مناسبات كنيستنا»: the 16 by the next date, the type fi
   assert.deepEqual(m.problems, []);
   await m.context.close();
 });
+
+test('P5: the Primary Admin\'s switch «مناسبات كنيستنا على الموقع» in «الإعدادات» (BREAD_OCCASIONS)', async () => {
+  for (const on of [false, true]) {
+    freshWorker();
+    fake.state.settings.occasions = on;
+    const d = await open();
+    await go(d.page, 'breadsettings');
+    await d.page.waitForSelector('[data-act="bread-occasions-switch"]', { timeout: 8000 });
+    assert.match(await d.page.$eval('[data-act="bread-occasions-switch"]', n => n.textContent), on ? /ظاهرين للشباب/ : /مقفول/);
+    assert.equal(await d.page.$eval('[data-act="bread-occasions-switch"] input', i => i.checked), on);
+    // the Primary Admin's switch only (as «سجل الشخصيات»): this world's admin is not the Primary
+    assert.equal(await d.page.$eval('[data-act="bread-occasions-switch"] input', i => i.disabled), true);
+    assert.deepEqual(d.problems, []);
+    await d.context.close();
+  }
+});

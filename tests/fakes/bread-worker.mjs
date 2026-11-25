@@ -36,7 +36,7 @@ export function createBreadWorker({ origin, today = cairoDay(), admin = 'admin@t
     daily: [],                         // { day, program_id, opens, reads, sent, reflections }
     reflections: [],                   // { id, program_id, n, day, text, state, name, created_ms, edited_ms }
     slots: [],                         // { device_id, minute }
-    settings: { module: false, push: false, emptyMuted: false, defaultTime: '08:00', maxSlots: 3, saints: false },
+    settings: { module: false, push: false, emptyMuted: false, defaultTime: '08:00', maxSlots: 3, saints: false, occasions: false },
     perms: { content: true, stats: true, reflections: true, saints: true },
     // P3: the draft (like D1 saints_items, seeded from P2), the publishes, the published file
     saints: {
@@ -245,6 +245,7 @@ export function createBreadWorker({ origin, today = cairoDay(), admin = 'admin@t
       if (b.emptyMuted !== undefined) { if (typeof b.emptyMuted !== 'boolean') throw new Fail('invalid', 'الطلب مش مفهوم.'); state.settings.emptyMuted = b.emptyMuted; changed++; }
       for (const k of ['module', 'push']) if (b[k] !== undefined) throw new Fail('denied', 'primary only');
       if (b.saints !== undefined) { state.settings.saints = !!b.saints; changed++; }
+      if (b.occasions !== undefined) { state.settings.occasions = !!b.occasions; changed++; }   // P5
       if (!changed) throw new Fail('invalid', 'مفيش حاجة اتغيرت.');
       return { settings: clone(state.settings) };
     }]
