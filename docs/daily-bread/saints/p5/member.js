@@ -110,21 +110,21 @@ function patronDays(o, iso) {
 }
 /* the praise in the card: its first stanza about the saint (the first one is to the Virgin), then the full reader */
 function praiseTeaser() {
-  const st = PRAISE.stanzas[1];
+  const st = [...PRAISE.verses[0], PRAISE.refrain];
   return `<blockquote class="oc__praise"><p class="oc__praise-title">${esc(PRAISE.title)}</p><p class="oc__praise-text">${st.map(esc).join('<br>')}</p>
-    <button class="oc__praise-go" type="button" data-praise>${bi('reading')}اقرا التمجيد كامل <small>${AR(PRAISE.stanzas.length)} مقطع</small></button></blockquote>`;
+    <button class="oc__praise-go" type="button" data-praise>${bi('reading')}اقرا التمجيد كامل <small>${AR(PRAISE.verses.length)} مقطع</small></button></blockquote>`;
 }
 function praiseSheet() {
   const p = byId(PRAISE.person); const a = (p.album || [])[0];
   return `<header class="pr__head">
       <span class="pr__face"><img src="${ROOT + a.media}" alt="" ${a.crop ? `style="object-position:${a.crop.x}% ${a.crop.y}%"` : ''}></span>
-      <div><p class="pr__kicker">شفيع كنيستنا</p><h2 class="pr__title" id="pr-title">${esc(PRAISE.title.replace('أبوسيفين', 'أبي سيفين'))}</h2>
-        <p class="pr__meta">${PRAISE.author ? 'كلمات: ' + esc(PRAISE.author) + ' · ' : ''}${AR(PRAISE.stanzas.length)} مقطع</p></div>
+      <div><p class="pr__kicker">شفيع كنيستنا</p><h2 class="pr__title" id="pr-title">${esc(PRAISE.title)}</h2>
+        <p class="pr__meta">${AR(PRAISE.verses.length)} مقطع · المرد: ${esc(PRAISE.refrain)}</p></div>
       <div class="pr__tools"><button class="pr__btn pr__btn--sm" type="button" data-size="-1" aria-label="صغّر الخط">أ</button><button class="pr__btn pr__btn--lg" type="button" data-size="1" aria-label="كبّر الخط">أ</button><button class="pr__btn" type="button" data-pr-close aria-label="اقفل">${si('close')}</button></div>
     </header>
     <div class="pr__body">
-      <ol class="pr__list">${PRAISE.stanzas.map((st, i) => `<li class="pr__st${i === 1 ? ' pr__st--mark' : ''}">${st.map(l => `<span>${esc(l)}</span>`).join('')}</li>`).join('')}</ol>
-      <footer class="pr__end"><span>من <a href="${esc(PRAISE.source)}" target="_blank" rel="noopener">موقع الأنبا تكلا</a></span><button class="pr__done" type="button" data-pr-close>${si('check')}ربنا يباركك، ارجع لليوم</button></footer>
+      <ol class="pr__list">${PRAISE.verses.map(v => `<li class="pr__st">${v.map(l => `<span>${esc(l)}</span>`).join('')}<span class="pr__ref">${esc(PRAISE.refrain)}</span></li>`).join('')}</ol>
+      <footer class="pr__end"><span>المصدر: <a href="${esc(PRAISE.source)}" target="_blank" rel="noopener">${esc(new URL(PRAISE.source).hostname.replace(/^www./, ''))}</a></span><button class="pr__done" type="button" data-pr-close>${si('check')}ربنا يباركك، ارجع لليوم</button></footer>
     </div>`;
 }
 function occasionCard(list, iso) {
@@ -213,4 +213,61 @@ document.addEventListener('click', e => {
 if (q.get('size')) html.dataset.size = q.get('size');
 if (q.get('praise') === '1') openPraise();
 document.title = `P5 المعاينة — ${list.length ? list[0].headline : 'يوم عادي'} (${day})`;
+/* ---------- the «كنيستنا» tab: our patron, today, and what is coming (owner 2026-11-25) ---------- */
+const TAB = q.get('tab') === 'church';
+function tabbarWithChurch() {
+  const slots = app.querySelector('.tabbar__slots'); if (!slots) return;
+  // wide screens have no bottom bar: the same place in the top bar
+  app.querySelector('.topbar__actions')?.insertAdjacentHTML('afterbegin', `<a class="topbar__btn br-church-top" href="?tab=church&d=${day}&w=${size}" ${TAB ? 'aria-current="page"' : ''} aria-label="كنيستنا">${si('church')}<span>كنيستنا</span></a>`);
+  const today = slots.querySelector('[data-tab="today"]');
+  today.insertAdjacentHTML('afterend', `<a class="tabbar__tab" href="?tab=church&d=${day}&w=${size}" data-tab="church">${si('church')}<span class="tabbar__word">كنيستنا</span></a>`);
+  if (TAB) { today.removeAttribute('aria-current'); slots.querySelector('[data-tab="church"]').setAttribute('aria-current', 'page'); }
+  requestAnimationFrame(() => {
+    const bar = app.querySelector('.tabbar'), cur = bar.querySelector('[aria-current]'), lens = bar.querySelector('.tabbar__lens');
+    if (!cur || !lens) return; const b = bar.getBoundingClientRect(), c = cur.getBoundingClientRect();
+    Object.assign(lens.style, { width: c.width + 'px', height: c.height + 'px', transform: `translate(${c.left - b.left - 1}px, ${c.top - b.top - 1}px)`, opacity: 1 });
+  });
+}
+const inDays = iso => Math.round((Date.parse(iso) - Date.parse(day)) / 864e5);
+const soon = n => n === 0 ? 'النهارده' : n === 1 ? 'بكره' : n < 11 ? `بعد ${AR(n)} أيام` : `بعد ${AR(n)} يوم`;
+function churchScreen() {
+  const next = OCC.occasions.map(o => ({ o, at: nextDate(dayOf(o), day) })).filter(x => x.at).sort((a, b) => a.at < b.at ? -1 : 1);
+  const merc = byId('mercurius'); const ma = merc.album[0];
+  const patron = `<section class="ch-patron"><span class="oc-arch ch-patron__pic" aria-hidden="true"><img src="${ROOT + ma.media}" alt="" style="object-position:${ma.crop ? ma.crop.x + '% ' + ma.crop.y + '%' : '50% 30%'}"><span class="oc-arch__ai">صورة تعبيرية</span></span>
+      <div class="ch-patron__body"><p class="oc__kicker"><span class="oc__crown">${si('cross')}شفيع كنيستنا</span></p><h2 class="oc__title">${esc(merc.name)}</h2>
+      ${patronDays(null, day)}<button class="oc__praise-go" type="button" data-praise>${bi('reading')}اقرا التمجيد كامل <small>${AR(PRAISE.verses.length)} مقطع</small></button></div></section>`;
+  const todayList = occasionsOn(day);
+  const todayCard = todayList.length ? `<h2 class="ch-h">${bi('sun')}النهارده</h2>${occasionCard(todayList, day)}` : '';
+  let month = '';
+  const rows = next.filter(x => x.at !== day).map(({ o, at }) => {
+    const pic = pictures(o)[0]; const n = inDays(at); const ym = at.slice(0, 7);
+    const head = ym !== month ? `<li class="ch-month">${GM[+at.slice(5, 7) - 1]} ${AR(at.slice(0, 4))}</li>` : ''; month = ym;
+    const who = o.from && o.type !== 'patron' ? byId(o.from.person).name : (o.people || []).map(id => byId(id).name).join(' و') || byId('mercurius').name;
+    return head + `<li><button class="ch-row${o.type === 'patron' ? ' ch-row--patron' : ''}" type="button" data-open="${o.id}" data-at="${at}">
+      <span class="ch-row__date"><b>${AR(+at.slice(8))}</b><small>${GM[+at.slice(5, 7) - 1]}</small></span>
+      ${pic ? `<span class="oc-arch ch-row__pic"><img src="${pic.src}" alt="" ${pic.crop ? `style="object-position:${pic.crop.x}% ${pic.crop.y}%"` : ''} loading="lazy"></span>` : ''}
+      <span class="ch-row__main"><b>${esc(o.headline.replace(/^النهارده /, ''))}</b><small>${esc(who)}</small><small class="ch-row__cop">${copticText(at)} · ${esc(TYPE[o.type])}</small></span>
+      <span class="ch-row__soon${n <= 7 ? ' is-near' : ''}">${soon(n)}</span></button></li>`;
+  }).join('');
+  return `<main id="main" class="br-sheet-page ch">
+    <div class="br-h1"><span class="br-remind__ic">${si('church')}</span><div><h1>كنيستنا</h1><p>أعياد شفيع كنيستنا، ومناسبات إيبارشيتنا وآبائنا، وكل اللي جاي.</p></div></div>
+    ${todayList.some(o => o.type === 'patron') ? '' : patron}${todayCard}
+    <section class="widget br-card ch-soon"><h2 class="br-kicker">${si('calendar')}الجاي</h2><ol class="ch-list">${rows}</ol></section>
+  </main>`;
+}
+function openOccasion(id, at) {
+  const o = OCC.occasions.find(x => x.id === id);
+  const d = document.createElement('dialog'); d.className = 'ch-sheet';
+  d.innerHTML = `<button class="oc-view__btn ch-sheet__x" type="button" data-sheet-close aria-label="اقفل">${si('close')}</button><p class="ch-sheet__when">${esc(dateText(at))} · ${soon(inDays(at))}</p>${occasionCard([o], at)}`;
+  const t = d.querySelector('.oc__title'); if (t && inDays(at) !== 0) t.textContent = t.textContent.replace(/^النهارده /, '');
+  document.body.append(d); d.showModal();
+  d.addEventListener('click', e => { if (e.target === d || e.target.closest('[data-sheet-close]')) { d.close(); d.remove(); } });
+}
+if (TAB) {
+  const main = app.querySelector('#main');
+  main.outerHTML = churchScreen();
+  document.addEventListener('click', e => { const b = e.target.closest('[data-open]'); if (b) openOccasion(b.dataset.open, b.dataset.at); });
+  if (q.get('open')) { const x = OCC.occasions.find(o => o.id === q.get('open')); if (x) openOccasion(x.id, nextDate(dayOf(x), day)); }
+}
+tabbarWithChurch();
 html.dataset.ready = '1';

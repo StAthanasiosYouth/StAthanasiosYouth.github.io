@@ -232,3 +232,76 @@ html[data-look="dawn"] .oc:not(.oc--patron) .oc-arch { background: #f1e2c4; }
   .pr__body { padding: 18px 16px 28px; }
   .pr__st::before { position: static; margin: 0 auto 6px; }
 }
+/* the tamgeed's response (المرد) after every verse: smaller, maroon, between two thin rules */
+.pr__st span:last-child { color: inherit; }
+.pr__st .pr__ref.pr__ref { display: flex; align-items: center; gap: 10px; justify-content: center; margin-top: 4px; font-size: .82em; color: var(--br-maroon); font-weight: 700; }
+.pr__st .pr__ref::before, .pr__st .pr__ref::after { content: ""; width: 28px; height: 1px; background: rgba(110, 31, 36, .35); }
+
+/* ======================================================================================================
+ * The «كنيستنا» tab (owner 2026-11-25, in P5): a fourth tab in the bar (النهارده · كنيستنا · إعداداتي · الموقع · حسابي).
+ *   .ch-patron  our patron: his arch, his three days, the full praise
+ *   .ch-list    what is coming, by month: date, picture, what, who, the Coptic day, «بعد ٩ أيام»; a tap opens its card
+ * ====================================================================================================== */
+.ch { gap: 18px; padding-bottom: 24px; }
+.ch-h { display: flex; align-items: center; gap: 8px; margin: 6px 2px -6px; font-size: .95rem; font-weight: 800; color: var(--gold-hi); }
+.ch-h .icon { width: 18px; height: 18px; color: var(--gold); }
+.ch .oc { margin: 0; width: 100%; }
+.ch-patron {
+  --oc-arch-w: 120px;
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 18px; align-items: start; padding: 20px; border-radius: 22px; color: #f6e4cc;
+  border: 1px solid rgba(var(--gold-hi-rgb), .6);
+  background: linear-gradient(90deg, transparent, rgba(var(--gold-hi-rgb), .8), transparent) top / 80% 1px no-repeat,
+    radial-gradient(120% 150% at 100% 0%, rgba(140, 40, 46, .96) 0%, rgba(92, 22, 30, .95) 46%, rgba(40, 10, 18, .96) 100%);
+  box-shadow: inset 0 0 0 5px rgba(40, 10, 18, .9), inset 0 0 0 6px rgba(var(--gold-hi-rgb), .32), 0 26px 60px -30px rgba(40, 0, 6, .85);
+}
+.ch-patron .oc-arch { cursor: default; border-color: var(--gold-hi); background: #3a0e16; }
+.ch-patron .oc__title { color: #ffe9b8; font-size: 1.45rem; }
+.ch-patron .oc__day { color: #f6e4cc; background: rgba(0, 0, 0, .16); }
+.ch-patron .oc__days { margin-top: 10px; }
+.ch-soon .br-kicker { margin-bottom: 6px; }
+.ch-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ch-month { margin: 10px 2px 0; font-size: .82rem; font-weight: 800; color: var(--text-3); }
+.ch-month:first-child { margin-top: 0; }
+.ch-row { width: 100%; display: grid; grid-template-columns: 48px auto minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 16px; border: 1px solid rgba(var(--gold-hi-rgb), .14); background: rgba(255, 255, 255, .03); color: var(--text); font: inherit; text-align: start; cursor: pointer; }
+.ch-row:hover { border-color: rgba(var(--gold-hi-rgb), .4); }
+.ch-row--patron { border-color: rgba(var(--gold-hi-rgb), .45); background: linear-gradient(90deg, rgba(110, 31, 36, .35), rgba(110, 31, 36, .08)); }
+.ch-row__date { display: grid; justify-items: center; line-height: 1.2; }
+.ch-row__date b { font-family: var(--font-display); font-weight: 400; font-size: 1.6rem; color: var(--gold-hi); }
+.ch-row__date small { font-size: .72rem; color: var(--text-3); }
+.ch-row__pic { --oc-arch-w: 44px; border-width: 1.5px; cursor: inherit; box-shadow: 0 6px 14px -6px rgba(0, 0, 0, .7); }
+.ch-row__main { display: grid; gap: 2px; min-width: 0; }
+.ch-row__main b { font-size: .98rem; line-height: 1.5; }
+.ch-row__main small { font-size: .8rem; color: var(--text-2); line-height: 1.5; }
+.ch-row__main .ch-row__cop { color: var(--text-3); }
+.ch-row__soon { padding: 3px 10px; border-radius: 99px; font-size: .76rem; font-weight: 800; color: var(--text-2); background: rgba(255, 255, 255, .05); white-space: nowrap; }
+.ch-row__soon.is-near { color: #1b1206; background: linear-gradient(180deg, var(--gold-hi), var(--gold)); }
+/* a tapped occasion: its card, as it shows on its day */
+.ch-sheet { width: min(96vw, 880px); max-height: 92vh; padding: 46px 14px 14px; border: 0; border-radius: 24px; background: linear-gradient(180deg, #0b2a4c, #10335a 60%, #3c4f7a); color: var(--text); overflow: auto; }
+.ch-sheet::backdrop { background: rgba(2, 9, 20, .78); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.ch-sheet .oc { margin: 0 auto; }
+.ch-sheet__x { position: absolute; top: 8px; inset-inline-end: 8px; }
+.ch-sheet__when { position: absolute; top: 16px; inset-inline-start: 18px; font-size: .84rem; font-weight: 800; color: var(--gold-hi); }
+@media (max-width: 640px) {
+  .ch-patron { --oc-arch-w: 92px; padding: 16px; gap: 14px; }
+  .ch-patron .oc__days, .ch-patron .oc__praise-go { grid-column: 1 / -1; }
+  .ch-patron__body { display: contents; }
+  .ch-patron__pic { grid-row: 1 / 3; }
+  .ch-patron .oc__kicker { grid-column: 2; grid-row: 1; align-self: end; margin: 0; }
+  .ch-patron .oc__title { grid-column: 2; grid-row: 2; align-self: start; margin: 0; font-size: 1.15rem; }
+  .ch-row { grid-template-columns: 40px auto minmax(0, 1fr); gap: 10px; }
+  .ch-row__soon { grid-column: 3; justify-self: start; margin-top: 2px; }
+  .ch-sheet { width: 100vw; max-height: 100dvh; height: 100dvh; border-radius: 0; padding-top: 50px; }
+}
+html[data-look="dawn"] .ch-row { color: var(--br-ink); background: #fffaf0; border-color: rgba(110, 31, 36, .14); }
+html[data-look="dawn"] .ch-row__date b, html[data-look="dawn"] .ch-h { color: var(--br-maroon); }
+html[data-look="dawn"] .ch-row__main small { color: var(--br-ink-2); }
+/* the bar with «كنيستنا»: four places + «حسابي» (the site's bar keeps three) */
+.br-page .tabbar__slots:has(> [data-tab="church"]) { flex: 4; }
+.br-page .tabbar__slots:has(> [data-tab="church"]) > .tabbar__tab { flex-basis: 25%; }
+/* wide screens (no bottom bar, bread.css ≥ 980): «كنيستنا» in the top bar */
+.br-church-top { display: none !important; }
+@media (min-width: 980px) {
+  .br-church-top { text-decoration: none; display: inline-flex !important; align-items: center; gap: 6px; width: auto !important; padding: 0 14px; font-weight: 800; font-size: .86rem; color: var(--gold-hi); }
+  .br-church-top .icon { width: 18px; height: 18px; }
+  .br-church-top[aria-current] { border-color: rgba(var(--gold-hi-rgb), .6); background: rgba(var(--gold-hi-rgb), .12); }
+}
