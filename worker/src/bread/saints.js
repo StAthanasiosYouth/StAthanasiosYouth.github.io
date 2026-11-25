@@ -17,8 +17,16 @@
  *            2026-11-24): the point kept in view (% of the picture) and the zoom (1–3) for the admin's small frames.
  * Top level `occasions`: church days that are not a person: { id, name, kind?, coptic | gregorian, year?, repeat?:
  * 'yearly' | 'once' (P3), date? (once: 'YYYY-MM-DD'), source, more?, note? }. «مناسبات كنيستنا» only.
+ * P5 (docs/daily-bread/saints/P5-PLAN.md, approved 2026-11-25) adds to an occasion:
+ *   from?    { person, feast }  its day (and source) is that person's day in the registry, never typed twice
+ *   covers?  [{ person, feast }] people's days the same day that this card stands for (never shown again that day)
+ *   type     'patron' | 'family' | 'diocese' | 'fathers' | 'church' | 'local'      look? 'pope' | 'bishop' | 'memorial'
+ *   badge?, honor? («مثلث الرحمات»), people? [id], headline, lead, pictures? [{ person?, media, caption? }]
+ *   notify?  reserved for P6 (the automatic notifications), ignored in P5
+ * And a praise may carry its full text (owner 2026-11-25: every praise in full on our own page):
+ *   praise { text, source, title?, refrain?, verses?: [[line…]…] }   text = the short excerpt the card shows
  */
-import { daysOfMonth, monthDays } from './coptic.js';
+import { daysOfMonth, monthDays, toCoptic } from './coptic.js';
 
 export const CLASSES = ['reposed', 'living'];
 export const MISSABLE = ['feasts', 'album'];
@@ -29,7 +37,10 @@ export const ALBUM_TYPES = ['ai', 'photo', 'art'];
 export const SITE_MEDIA_IMG = /^\/media\/\d{4}\/[a-z]{3}-[a-z0-9]{8}\.(?:webp|jpg)$/;
 export const IMG_DIR = 'assets/img/saints/';
 export const ID_RE = /^[a-z0-9]+$/;
-export const LIMITS = { name: 120, kind: 120, title: 200, note: 1500, need: 400, praise: 1500, word: 2000, stage: 80, caption: 200, src: 300, album: 40, feasts: 12, milestones: 40, sources: 20, more: 10 };
+export const LIMITS = { name: 120, kind: 120, title: 200, note: 1500, need: 400, praise: 1500, word: 2000, stage: 80, caption: 200, src: 300, album: 40, feasts: 12, milestones: 40, sources: 20, more: 10, headline: 160, lead: 700, badge: 60, pictures: 12, covers: 6, verses: 150, verse: 6, line: 200, praiseFull: 20000 };
+export const OCC_TYPES = ['patron', 'family', 'diocese', 'fathers', 'church', 'local'];
+export const OCC_LOOKS = ['pope', 'bishop', 'memorial'];
+export const OCC_TYPE_NAMES = { patron: 'شفيع كنيستنا', family: 'شفيع أسرتنا', diocese: 'إيبارشيتنا وآباؤها الأساقفة', fathers: 'آباء كنيستنا', church: 'تاريخ كنيستنا', local: 'تذكار عندنا' };
 const URL_RE = /^https:\/\/[^\s<>"']+$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 export const MEDIA_RE = /^media\/\d{4}\/[a-z]{3}-[a-z0-9]{8}\.(?:webp|jpg)$/;
@@ -141,6 +152,13 @@ export function checkPerson(p, { cats = {}, imageExists = null, pictureExists = 
     const q = p.praise;
     if (!q || !text(q.text, LIMITS.praise)) e('التمجيد: النص فاضي أو طويل (لحد ١٥٠٠ حرف).');
     if (!q || typeof q.source !== 'string' || !URL_RE.test(q.source)) e('التمجيد: المصدر لازم رابط https.');
+    // P5: the full praise (owner 2026-11-25), verses of 1–6 lines, and its response (المرد)
+    if (q && q.refrain != null && !optText(q.refrain, LIMITS.line)) e('التمجيد: المرد طويل.');
+    if (q && q.verses != null) {
+      const ok = Array.isArray(q.verses) && q.verses.length <= LIMITS.verses && q.verses.every(v => Array.isArray(v) && v.length > 0 && v.length <= LIMITS.verse && v.every(l => text(l, LIMITS.line)));
+      if (!ok) e(`التمجيد الكامل: لازم مقاطع (لحد ${LIMITS.verses})، وكل مقطع من ١ لـ${LIMITS.verse} أبيات، وكل بيت لحد ${LIMITS.line} حرف.`);
+      else if (q.verses.flat().join('').length > LIMITS.praiseFull) e('التمجيد الكامل طويل.');
+    }
   }
   if (!optText(p.word, LIMITS.word)) e('الكلمة طويلة.');
   if (p.image != null) {
@@ -153,13 +171,38 @@ export function checkPerson(p, { cats = {}, imageExists = null, pictureExists = 
   return errs;
 }
 
-export function checkOccasion(o) {
+/* a {person, feast} link: the person exists and has that day (people = the registry's people; null = not checked) */
+const linkOk = (l, people) => !!l && typeof l === 'object' && typeof l.person === 'string' && ID_RE.test(l.person) && text(l.feast, LIMITS.kind)
+  && (!people || !!((people.find(p => p.id === l.person) || { feasts: [] }).feasts || []).find(f => f.kind === l.feast));
+
+export function checkOccasion(o, { people = null } = {}) {
   const errs = [];
   const who = (o && o.id) || '?';
   const e = m => errs.push(`${who}: ${m}`);
   if (!o || typeof o.id !== 'string' || !ID_RE.test(o.id) || o.id.length > 40) { e('id لازم حروف إنجليزي صغيرة وأرقام بس.'); return errs; }
   if (!text(o.name, LIMITS.name)) e('الاسم فاضي.');
-  checkDay(o, e, { occasion: true });
+  if (o.from != null) {
+    // P5: the day is a person's day in the registry (its date and source come from there)
+    if (!linkOk(o.from, people)) e('«من يوم شخص»: الشخص أو اليوم مش موجود في السجل.');
+    if (o.coptic != null || o.gregorian != null || o.date != null || o.repeat === 'once') e('«من يوم شخص»: التاريخ بييجي من السجل، من غير تاريخ تاني.');
+    if (o.source != null && (typeof o.source !== 'string' || !URL_RE.test(o.source))) e('المصدر لازم رابط https.');
+    if (!optText(o.note, LIMITS.note)) e('الملحوظة طويلة.');
+  } else checkDay(o, e, { occasion: true });
+  if (o.type != null && !OCC_TYPES.includes(o.type)) e(`النوع لازم ${OCC_TYPES.join(' أو ')}.`);
+  if (o.look != null && !OCC_LOOKS.includes(o.look)) e(`الشكل لازم ${OCC_LOOKS.join(' أو ')}.`);
+  if (!optText(o.badge, LIMITS.badge) || !optText(o.honor, LIMITS.badge)) e('العلامة أو اللقب طويل.');
+  if (!optText(o.headline, LIMITS.headline)) e(`العنوان طويل (لحد ${LIMITS.headline} حرف).`);
+  if (!optText(o.lead, LIMITS.lead)) e(`الكلام طويل (لحد ${LIMITS.lead} حرف).`);
+  if (o.covers != null && (!Array.isArray(o.covers) || o.covers.length > LIMITS.covers || !o.covers.every(c => linkOk(c, people)))) e('«بتغطّي»: يوم شخص مش موجود في السجل.');
+  if (o.people != null && (!Array.isArray(o.people) || o.people.length > LIMITS.covers || !o.people.every(id => typeof id === 'string' && ID_RE.test(id) && (!people || people.some(p => p.id === id))))) e('الأشخاص: حد مش موجود في السجل.');
+  if (o.pictures != null) {
+    if (!Array.isArray(o.pictures) || o.pictures.length > LIMITS.pictures) e(`الصور لازم قايمة (لحد ${LIMITS.pictures}).`);
+    for (const x of Array.isArray(o.pictures) ? o.pictures : []) {
+      if (!x || typeof x.media !== 'string' || !MEDIA_RE.test(x.media)) e('الصور لازم من مكتبة الصور (media/YYYY/…).');
+      if (x && x.person != null && (typeof x.person !== 'string' || !ID_RE.test(x.person))) e('صورة: الشخص مش مفهوم.');
+      if (x && !optText(x.caption, LIMITS.caption)) e('صورة: الوصف طويل.');
+    }
+  }
   return errs;
 }
 
@@ -176,7 +219,7 @@ export function check(reg, opts = {}) {
   }
   if (reg.occasions != null && !Array.isArray(reg.occasions)) errs.push('occasions لازم قايمة.');
   for (const o of reg.occasions || []) {
-    errs.push(...checkOccasion(o));
+    errs.push(...checkOccasion(o, { people: reg.people }));
     if (o && typeof o.id === 'string') { if (ids.has(o.id)) errs.push(`${o.id}: id متكرر.`); ids.add(o.id); }
   }
   return errs;
@@ -229,7 +272,7 @@ export function occasionsOfMonth(reg, ym) {
   const out = [];
   for (const day of daysOfMonth(ym)) {
     for (const p of people) for (const f of p.feasts) if (isOn(f, day)) out.push({ date: day.date, coptic: { m: day.m, d: day.d }, person: p, occasion: f });
-    for (const o of reg.occasions || []) if (isOn(o, day)) out.push({ date: day.date, coptic: { m: day.m, d: day.d }, person: null, occasion: o });
+    for (const o of reg.occasions || []) { const f = dayOfOccasion(reg, o); if (f && isOn(f, day)) out.push({ date: day.date, coptic: { m: day.m, d: day.d }, person: null, occasion: o }); }
   }
   return out;
 }
@@ -264,7 +307,11 @@ export function publicFile(reg) {
       return x;
     });
     if (album.length) o.album = album;
-    if (p.praise) o.praise = { text: p.praise.text, source: p.praise.source, ...(p.praise.title ? { title: p.praise.title } : {}) };
+    if (p.praise) {
+      o.praise = { text: p.praise.text, source: p.praise.source, ...(p.praise.title ? { title: p.praise.title } : {}) };
+      if (p.praise.refrain) o.praise.refrain = p.praise.refrain;
+      if (Array.isArray(p.praise.verses)) o.praise.verses = p.praise.verses;
+    }
     if (p.image) o.image = { file: p.image.file, source: p.image.source };
     if (p.word) o.word = p.word;
     return o;
@@ -272,9 +319,98 @@ export function publicFile(reg) {
   const occasions = (reg.occasions || []).map(o => {
     const x = { id: o.id, name: o.name };
     if (o.kind) x.kind = o.kind;
-    if (o.repeat === 'once') { x.repeat = 'once'; x.date = o.date; } else { if (o.coptic) x.coptic = o.coptic; else x.gregorian = o.gregorian; if (o.year != null) x.year = o.year; }
-    x.source = o.source;
+    if (o.from) x.from = { person: o.from.person, feast: o.from.feast };
+    else if (o.repeat === 'once') { x.repeat = 'once'; x.date = o.date; } else { if (o.coptic) x.coptic = o.coptic; else x.gregorian = o.gregorian; if (o.year != null) x.year = o.year; }
+    if (o.source) x.source = o.source;
+    for (const k of ['type', 'look', 'badge', 'honor', 'headline', 'lead', 'covers', 'people', 'pictures']) if (o[k] != null) x[k] = o[k];
     return x;
   });
   return { schema: 2, categories: reg.categories, people, occasions };
+}
+
+/* ======================================================================================================
+ * P5 — «مناسبات كنيستنا» (docs/daily-bread/saints/P5-PLAN.md). The rules shared by the Worker (the published file),
+ * the tools and the tests; the member page keeps the same day rule (assets/js/bread/occasions.js).
+ * ====================================================================================================== */
+
+/* the day an occasion keeps: its own, or (from) the person's day in the registry, with that day's source */
+export function dayOfOccasion(reg, o) {
+  if (!o || !o.from) return o;
+  const p = (reg.people || []).find(x => x.id === o.from.person);
+  const f = p && (p.feasts || []).find(x => x.kind === o.from.feast);
+  return f ? { ...f, source: o.source || f.source } : null;
+}
+/* the people's days a card stands for: [[person, feast]…], never shown again that day (not in «نحب نفكّرك») */
+export const hidesOf = o => [...(o.from ? [[o.from.person, o.from.feast]] : []), ...(o.covers || []).map(c => [c.person, c.feast])];
+/* a living father's day that no occasion is linked to: a plain card, so nobody's day is lost */
+export const autoOccasion = (p, f, i) => ({ id: 'auto' + p.id + i, auto: true, name: p.name, type: 'fathers', from: { person: p.id, feast: f.kind }, headline: `النهارده ${f.kind}`, people: [p.id] });
+
+function withAutos(reg) {
+  const linked = new Set((reg.occasions || []).flatMap(hidesOf).map(h => h.join('|')));
+  const autos = (reg.people || []).filter(p => p.class === 'living' && scheduled(withStatus(p)))
+    .flatMap(p => p.feasts.map((f, i) => (linked.has(p.id + '|' + f.kind) ? null : autoOccasion(p, f, i))).filter(Boolean));
+  return [...(reg.occasions || []), ...autos];
+}
+
+/* the occasions of one Cairo day ('YYYY-MM-DD'), in the registry's order: the first leads the one card (P6 reads this too) */
+export function occasionsOn(reg, date) {
+  const c = toCoptic(date);
+  const day = { date, y: c.y, m: c.m, d: c.d };
+  return withAutos(reg).filter(o => { const f = dayOfOccasion(reg, o); return !!f && isOn(f, day); });
+}
+
+/*
+ * The published «مناسبات كنيستنا» file (daily-bread/data/occasions.json): what the member page needs, nothing
+ * internal — every occasion with its day resolved, its people's names, its pictures from the albums, what it hides;
+ * and the two patrons (our church's, our family's) with their days and their full praise.
+ */
+export function occasionsFile(reg) {
+  const people = new Map((reg.people || []).map(p => [p.id, p]));
+  const albumOf = media => { for (const p of people.values()) { const a = (p.album || []).find(x => x.media === media); if (a) return a; } return null; };
+  const pic = x => {
+    const a = albumOf(x.media);
+    const o = { img: '/' + x.media, ai: labelOf(a) };
+    if (a && a.crop) o.crop = a.crop;
+    const cap = x.caption || (a && a.caption);
+    if (cap) o.caption = cap;
+    return o;
+  };
+  const dayOut = f => {
+    const o = {};
+    if (f.repeat === 'once') { o.repeat = 'once'; o.date = f.date; } else if (f.coptic) o.coptic = f.coptic; else o.gregorian = f.gregorian;
+    if (f.year != null) o.year = f.year;
+    return o;
+  };
+  const occasions = withAutos(reg).map(o => {
+    const f = dayOfOccasion(reg, o);
+    if (!f) return null;
+    const lead = o.from ? people.get(o.from.person) : (o.people || []).length === 1 ? people.get(o.people[0]) : null;
+    const names = (o.people || (o.from ? [o.from.person] : [])).map(id => people.get(id)).filter(Boolean).map(p => p.name);
+    let pictures = (o.pictures || []).map(pic);
+    if (!pictures.length && lead) { const a = pictureFor(lead, f.kind, 0); if (a) pictures = [{ img: a.img, ai: a.ai }]; }
+    const x = { id: o.id, type: o.type || 'church', headline: o.headline || o.name, who: lead ? (o.honor ? o.honor + ' ' : '') + lead.name : names.join(' و'), ...dayOut(f) };
+    for (const k of ['look', 'badge', 'lead']) if (o[k]) x[k] = o[k];
+    if (names.length > 1) x.names = names;
+    if (pictures.length) x.pictures = pictures;
+    if (f.source) x.source = f.source;
+    if (o.from) x.from = [o.from.person, o.from.feast];
+    x.hides = hidesOf(o);
+    return x;
+  }).filter(Boolean);
+  const patrons = {};
+  for (const o of reg.occasions || []) {
+    if ((o.type !== 'patron' && o.type !== 'family') || !o.from || patrons[o.type]) continue;
+    const p = people.get(o.from.person);
+    if (!p) continue;
+    const a = (p.album || []).find(x => x.main && x.media) || (p.album || []).find(x => x.media);
+    const x = { id: p.id, name: p.name, days: p.feasts.map(f => ({ kind: f.kind, ...dayOut(f) })) };
+    if (a) { x.img = '/' + a.media; x.ai = labelOf(a); if (a.crop) x.crop = a.crop; }
+    if (p.praise) {
+      x.praise = { title: p.praise.title || '', text: p.praise.text, source: p.praise.source };
+      if (p.praise.refrain) x.praise.refrain = p.praise.refrain;
+      if (Array.isArray(p.praise.verses)) x.praise.verses = p.praise.verses;
+    }
+    patrons[o.type] = x;
+  }
+  return { schema: 1, types: OCC_TYPE_NAMES, occasions, patrons };
 }

@@ -212,7 +212,10 @@ export function checkFeasts(body) {
     if (!img.ok || (img.value && !TAKLA_URL.test(img.value) && !SAINT_IMG.test(img.value) && !MEDIA_IMG.test(img.value))) { err('الصورة لازم من st-takla.org أو من صور القديسين في الموقع أو من مكتبة الصور.'); continue; }
     if (f.imgAi != null && typeof f.imgAi !== 'boolean') { err('«صورة تعبيرية» لازم آه أو لأ.'); continue; }
     if (!praise.ok || (praise.value && !HTTPS_URL.test(praise.value)) || !praiseTitle.ok || !praiseText.ok || (praiseText.value && !praise.value)) { err('التمجيد: النص لازم يكون معاه رابط مصدره.'); continue; }
-    out.push({ date, name: name.value, title: title.ok ? title.value : null, word: word.value, url: url.value, img: img.value || undefined, imgAi: img.value && f.imgAi === true ? true : undefined, praise: praise.value || undefined, praiseTitle: praiseTitle.value || undefined, praiseText: praiseText.value || undefined });
+    // P5: whose day it is (the registry's id and day), so «مناسبات كنيستنا» can stand for it without a second card
+    const person = typeof f.person === 'string' && /^[a-z0-9]{1,40}$/.test(f.person) ? f.person : undefined;
+    const kind = person && typeof f.kind === 'string' && f.kind.trim() && f.kind.length <= 120 ? f.kind.trim() : undefined;
+    out.push({ date, name: name.value, title: title.ok ? title.value : null, word: word.value, url: url.value, img: img.value || undefined, imgAi: img.value && f.imgAi === true ? true : undefined, praise: praise.value || undefined, praiseTitle: praiseTitle.value || undefined, praiseText: praiseText.value || undefined, person, kind });
   }
   if (errors.length) return { ok: false, errors };
   out.sort((a, b) => (a.date < b.date ? -1 : 1));

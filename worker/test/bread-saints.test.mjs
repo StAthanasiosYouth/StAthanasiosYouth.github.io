@@ -36,7 +36,7 @@ test('migration + seed: the 108 people and the diocese from P2, status computed,
   const { h } = await world({ on: false });
   const n = k => h.db.prepare('SELECT COUNT(*) AS n FROM saints_items WHERE kind = ?').bind(k).first('n');
   assert.equal(await n('person'), 108);
-  assert.equal(await n('occasion'), 1);
+  assert.equal(await n('occasion'), 16, 'P2's diocese + the 15 of P5 (0037)');
   assert.equal(await h.db.prepare("SELECT value FROM settings WHERE key = 'BREAD_SAINTS'").first('value'), '0');
   const mar = JSON.parse(await h.db.prepare("SELECT data FROM saints_items WHERE kind = 'person' AND id = 'isaacsyrian'").first('data'));
   assert.deepEqual([mar.status, mar.missing], ['incomplete', ['feasts']]);
@@ -59,7 +59,7 @@ test('the switch: off → every saints route is `disabled`; the Primary Admin tu
   assert.equal((await w.admin('GET', 'bread/settings')).body.settings.saints, true);
   const l = await w.admin('GET', 'bread/saints');
   assert.equal(l.status, 200);
-  assert.equal(l.body.items.length, 109);
+  assert.equal(l.body.items.length, 124, '108 people + 16 occasions (P5)');
   assert.equal(l.body.published, null);
   assert.ok(l.body.items.every(i => i.state === 'new'), 'nothing published yet');
 });
@@ -75,7 +75,7 @@ test('first publish: saints.json without the internal parts, a snapshot, a mirro
   assert.equal(file.people.length, 108);
   const raw = row.body;
   for (const internal of ['"pending"', '"src"', '"note"', 'picturesRoot', '"sources"']) assert.ok(!raw.includes(internal), internal + ' stays internal');
-  assert.equal((await w.h.db.prepare("SELECT COUNT(*) AS n FROM publish_jobs WHERE mode = 'bread'").first('n')), 1);
+  assert.equal((await w.h.db.prepare("SELECT COUNT(*) AS n FROM publish_jobs WHERE mode = 'bread'").first('n')), 2, 'saints.json + occasions.json (P5)');
   assert.equal((await w.h.db.prepare('SELECT COUNT(*) AS n FROM saints_snapshots').first('n')), 1);
   assert.ok((await w.admin('GET', 'bread/saints')).body.items.every(i => i.state === 'published'));
   // the «الأعياد» tab: February 2027 has Anba Theophilus's repose (12 Feb); no living father anywhere

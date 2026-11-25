@@ -9,7 +9,8 @@
  *   POST /v1/admin/bread/saints/item/revert   { kind, id }             back to how it was published («رجّع»)
  *   GET  /v1/admin/bread/saints/review                  what changed since the last publish, the problems, who joins
  *                                                       or leaves the automatic days, and `expect` for the publish
- *   POST /v1/admin/bread/saints/publish       { expect } daily-bread/data/saints.json + a snapshot of the whole registry
+ *   POST /v1/admin/bread/saints/publish       { expect } daily-bread/data/saints.json + daily-bread/data/occasions.json
+ *                                                       (P5) + a snapshot of the whole registry
  *   GET  /v1/admin/bread/saints/history                 the publishes
  *   POST /v1/admin/bread/saints/restore       { rev, confirm }  an older publish becomes the draft and is published again
  *   GET  /v1/admin/bread/saints/feasts?month=           the month's feasts from the PUBLISHED registry (bread.content:
@@ -26,13 +27,16 @@ import { retry } from '../lib/db.js';
 import { sha256 } from '../lib/hash.js';
 import { limit } from '../lib/ratelimit.js';
 import { activityStmt } from '../lib/activity.js';
-import { checkPerson, checkOccasion, check, withStatus, scheduled, feastsOfMonth, publicFile, pictureFor, ID_RE } from './saints.js';
+import { checkPerson, checkOccasion, check, withStatus, scheduled, feastsOfMonth, publicFile, occasionsFile, pictureFor, ID_RE } from './saints.js';
 import { fileStmts, mirrorSoon } from './store.js';
 
 export const SAINTS_ITEM_MAX_BYTES = 32 * 1024;
 const KINDS = ['person', 'occasion'];
 const PERSON_KEYS = ['id', 'name', 'cat', 'class', 'feasts', 'milestones', 'sources', 'pending', 'album', 'praise', 'image', 'word', 'note'];
-const OCCASION_KEYS = ['id', 'name', 'kind', 'coptic', 'gregorian', 'year', 'repeat', 'date', 'source', 'more', 'note'];
+const OCCASION_KEYS = ['id', 'name', 'kind', 'coptic', 'gregorian', 'year', 'repeat', 'date', 'source', 'more', 'note',
+  // P5: «مناسبات كنيستنا» (P5-PLAN.md §2); notify is P6's, kept as it is
+  'from', 'covers', 'type', 'look', 'badge', 'honor', 'people', 'headline', 'lead', 'pictures', 'notify'];
+export const OCCASIONS_KEY = 'occasions';   // P5: daily-bread/data/occasions.json, published with saints.json
 export const FILE_KEY = 'saints';
 
 const bad = (message, extra = {}) => new ApiError('invalid', 'saints', { message, ...extra });
@@ -112,7 +116,11 @@ export async function adminSaintsSave(ctx) {
     item = withStatus(item);
     const cats = JSON.parse((await retry(() => db.prepare("SELECT data FROM saints_items WHERE kind = 'meta' AND id = 'categories'").first('data'))) || '{}');
     errors = checkPerson(item, { cats });
-  } else errors = checkOccasion(item);
+  } else {
+    // P5: a link to a person's day is checked against the draft's people
+    const people = (await retry(() => db.prepare("SELECT data FROM saints_items WHERE kind = 'person' AND deleted_ms IS NULL").all())).results.map(r => JSON.parse(r.data));
+    errors = checkOccasion(item, { people });
+  }
   if (errors.length) throw bad('فيه حاجات محتاجة تتصلح.', { errors: errors.slice(0, 20) });
   const data = JSON.stringify(item);
   if (data.length > SAINTS_ITEM_MAX_BYTES) throw bad('البيانات كبيرة أوي.');
@@ -191,7 +199,7 @@ export async function adminSaintsRevert(ctx) {
 
 /* ---------- review and publish ---------- */
 
-export const LABELS = { name: 'الاسم', class: 'النوع', cat: 'المجموعة', feasts: 'أيام التذكار', milestones: 'محطات العمر', album: 'الألبوم', praise: 'التمجيد', sources: 'مصادر السيرة', pending: 'لسه بندوّر على', image: 'الصورة على الموقع', word: 'الكلمة', note: 'ملحوظة', kind: 'المناسبة', coptic: 'اليوم القبطي', gregorian: 'اليوم الميلادي', year: 'السنة', repeat: 'التكرار', date: 'التاريخ', source: 'المصدر', more: 'مصادر زيادة' };
+export const LABELS = { name: 'الاسم', class: 'النوع', cat: 'المجموعة', feasts: 'أيام التذكار', milestones: 'محطات العمر', album: 'الألبوم', praise: 'التمجيد', sources: 'مصادر السيرة', pending: 'لسه بندوّر على', image: 'الصورة على الموقع', word: 'الكلمة', note: 'ملحوظة', kind: 'المناسبة', from: 'اليوم من السجل', covers: 'بتغطّي', type: 'النوع', look: 'الشكل', badge: 'العلامة', honor: 'اللقب', people: 'الأشخاص', headline: 'العنوان', lead: 'الكلام', pictures: 'الصور', coptic: 'اليوم القبطي', gregorian: 'اليوم الميلادي', year: 'السنة', repeat: 'التكرار', date: 'التاريخ', source: 'المصدر', more: 'مصادر زيادة' };
 const SKIP = new Set(['status', 'missing', 'id']);
 
 async function review(db) {
@@ -243,6 +251,8 @@ export async function adminSaintsPublish(ctx) {
   const now = Date.now(), by = ctx.actor.email;
   const body = JSON.stringify(publicFile(r.draft)) + '\n';
   const pub = await fileStmts(db, { key: FILE_KEY, body, by, now });
+  // P5: «مناسبات كنيستنا» for the member page, in the same publish
+  const occ = await fileStmts(db, { key: OCCASIONS_KEY, body: JSON.stringify(occasionsFile(r.draft)) + '\n', by, now });
   const rev = (r.snap ? r.snap.rev : 0) + 1;
   const note = noteOf(r);
   const tags = JSON.stringify(r.live);
@@ -251,6 +261,7 @@ export async function adminSaintsPublish(ctx) {
     db.prepare('INSERT INTO saints_snapshots (rev, data, people, occasions, note, publish_id, at, by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
       .bind(rev, JSON.stringify(r.draft), r.draft.people.length, r.draft.occasions.length, note, pub.publishId, now, by),
     ...pub.stmts,
+    ...occ.stmts,
     // exactly the versions this review saw are now published (a save in between stays «changed»)
     db.prepare("UPDATE saints_items SET pub_rev = rev WHERE deleted_ms IS NULL AND (kind || ':' || id || ':' || rev) IN (SELECT value FROM json_each(?))").bind(tags),
     db.prepare("DELETE FROM saints_items WHERE deleted_ms IS NOT NULL AND (kind || ':' || id || ':' || rev) IN (SELECT value FROM json_each(?))").bind(gone),
@@ -282,6 +293,7 @@ export async function adminSaintsRestore(ctx) {
   const rev = last.rev + 1;
   const body = JSON.stringify(publicFile(reg)) + '\n';
   const pub = await fileStmts(db, { key: FILE_KEY, body, by, now });
+  const occ = await fileStmts(db, { key: OCCASIONS_KEY, body: JSON.stringify(occasionsFile(reg)) + '\n', by, now });
   const note = 'رجوع للنسخة ' + old.rev;
   await retry(() => db.batch([
     db.prepare("DELETE FROM saints_items WHERE kind IN ('person', 'occasion')"),
@@ -289,6 +301,7 @@ export async function adminSaintsRestore(ctx) {
     db.prepare("INSERT INTO saints_items (kind, id, ord, data, rev, pub_rev, updated_at, updated_by) SELECT 'occasion', json_extract(value, '$.id'), key + 1, value, 1, 1, ?, ? FROM json_each(?, '$.occasions')").bind(now, by, old.data),
     db.prepare('INSERT INTO saints_snapshots (rev, data, people, occasions, note, publish_id, at, by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(rev, old.data, reg.people.length, (reg.occasions || []).length, note, pub.publishId, now, by),
     ...pub.stmts,
+    ...occ.stmts,
     act(ctx, 'bread.saints.restore', 'v' + rev, 'سجل الشخصيات', 'سجل الشخصيات رجع للنسخة ' + old.rev + ' (اتنشرت كنسخة ' + rev + ')')
   ]));
   await mirrorSoon(ctx.env, ctx.defer);

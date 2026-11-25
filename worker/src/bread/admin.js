@@ -340,7 +340,7 @@ export async function adminBreadSettingsSave(ctx) {
     if (typeof b.emptyMuted !== 'boolean') throw bad('الطلب مش مفهوم.');
     stmts.push(settingStmt(db, 'BREAD_EMPTY_MUTED', b.emptyMuted ? '1' : '0', by, now)); changed.push('emptyMuted');
   }
-  for (const [k, key] of [['module', 'BREAD_MODULE'], ['push', 'BREAD_PUSH'], ['saints', 'BREAD_SAINTS']]) {
+  for (const [k, key] of [['module', 'BREAD_MODULE'], ['push', 'BREAD_PUSH'], ['saints', 'BREAD_SAINTS'], ['occasions', 'BREAD_OCCASIONS']]) {
     if (b[k] === undefined) continue;
     if (typeof b[k] !== 'boolean') throw bad('الطلب مش مفهوم.');
     if (ctx.env.ENVIRONMENT !== 'staging' && ctx.env.ENVIRONMENT !== 'test' && ctx.actor.role !== 'primary') throw new ApiError('denied', 'primary only', { perm: 'primary' });

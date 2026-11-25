@@ -58,7 +58,7 @@ import { adminPushCheck, adminPushTest } from './push/send.js';
 import { publicRoute } from './route.js';
 import { pushReceipt } from './push/receipt.js';
 import { pushRemind } from './push/remind.js';
-import { breadFileIndex, breadFileDay, breadFileFeasts, breadToday, breadOpen, breadSlots, breadMe, breadReflect, breadReflectEdit, breadReflectDelete } from './bread/public.js';
+import { breadFileIndex, breadFileDay, breadFileFeasts, breadFileOccasions, breadToday, breadOpen, breadSlots, breadMe, breadReflect, breadReflectEdit, breadReflectDelete } from './bread/public.js';
 import {
   adminBreadPrograms, adminBreadCreate, adminBreadTopics, adminBreadTopicList, adminBreadActivate, adminBreadStop, adminBreadDelete, adminBreadStats, adminBreadReflections,
   adminBreadSettings, adminBreadSettingsSave, adminBreadSuggest, adminBreadFeasts, adminBreadFeastsGet, UPLOAD_MAX_BYTES as BREAD_UPLOAD_MAX_BYTES
@@ -475,6 +475,7 @@ export const ROUTES = [
   // «خبزنا اليومي» (bread/public.js): off until BREAD_MODULE = '1'
   { method: 'GET', path: '/v1/bread/file/index', auth: 'public', handler: breadFileIndex },
   { method: 'GET', path: '/v1/bread/file/feasts/:month', auth: 'public', handler: breadFileFeasts },
+  { method: 'GET', path: '/v1/bread/file/occasions', auth: 'public', handler: breadFileOccasions },
   { method: 'GET', path: '/v1/bread/file/:program/:n', auth: 'public', handler: breadFileDay },
   { method: 'POST', path: '/v1/bread/today', auth: 'public', maxBytes: 1024, handler: breadToday },
   { method: 'POST', path: '/v1/bread/open', auth: 'public', maxBytes: 512, handler: breadOpen },

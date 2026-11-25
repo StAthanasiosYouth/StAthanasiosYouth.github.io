@@ -1000,7 +1000,7 @@
       el('div', { class: 'ba-actions' }, toggle, el('span', { class: 'sp' }),
         same ? tag(on.length ? 'اتنشرت ✓' : 'اتنشرت فاضية: مفيش عيد ظاهر', 'ok') : st.published !== null ? tag('فيه تعديل مش منشور', 'warn') : null,
         btn(label, 'check', 'btn--primary btn--sm', { 'data-act': 'bread-feasts', disabled: same || (st.published === null && !on.length), onclick: function (event) {
-          var body = { month: month, feasts: on.map(function (f) { return { date: f.date, name: f.name, title: f.title || undefined, word: f.word, url: f.sourceUrl, img: f.img || undefined, imgAi: f.img && f.imgAi ? true : undefined, praise: f.praise || undefined, praiseTitle: f.praiseText ? f.praiseTitle || undefined : undefined, praiseText: f.praiseText || undefined }; }) };
+          var body = { month: month, feasts: on.map(function (f) { return { date: f.date, name: f.name, title: f.title || undefined, word: f.word, url: f.sourceUrl, img: f.img || undefined, imgAi: f.img && f.imgAi ? true : undefined, praise: f.praise || undefined, praiseTitle: f.praiseText ? f.praiseTitle || undefined : undefined, praiseText: f.praiseText || undefined, person: f.id || undefined, kind: f.id ? f.kind || undefined : undefined }; }) };
           A.withBusy(event.currentTarget, api('POST', 'feasts', body).then(function () { st.published = key; A.toast('اتنشرت أعياد ' + monthName(month)); A.render(); })).catch(function (error) { A.fail(error); });
         } }))
     ]);

@@ -14,7 +14,7 @@ import { logLine } from '../lib/log.js';
 import { makeJob } from '../jobs.js';
 import { indexFile, filePath } from './model.js';
 
-export const SETTING_KEYS = ['BREAD_MODULE', 'BREAD_PUSH', 'BREAD_EMPTY_MUTED', 'bread_default_time', 'bread_max_slots', 'BREAD_SAINTS'];
+export const SETTING_KEYS = ['BREAD_MODULE', 'BREAD_PUSH', 'BREAD_EMPTY_MUTED', 'bread_default_time', 'bread_max_slots', 'BREAD_SAINTS', 'BREAD_OCCASIONS'];
 
 export async function breadSettings(db) {
   const { results } = await retry(() => db.prepare(`SELECT key, value FROM settings WHERE key IN (${SETTING_KEYS.map(() => '?').join(',')})`).bind(...SETTING_KEYS).all());
@@ -24,6 +24,7 @@ export async function breadSettings(db) {
     push: s.BREAD_PUSH === '1',
     emptyMuted: s.BREAD_EMPTY_MUTED === '1',
     saints: s.BREAD_SAINTS === '1',   // P3: the saints registry in the admin
+    occasions: s.BREAD_OCCASIONS === '1',   // P5: «مناسبات كنيستنا» on the member page (the card, the «كنيستنا» tab)
     defaultTime: /^\d{2}:\d{2}$/.test(s.bread_default_time || '') ? s.bread_default_time : '08:00',
     maxSlots: Math.max(1, Math.min(3, Number(s.bread_max_slots) || 3))
   };
@@ -37,6 +38,12 @@ export const settingStmt = (db, key, value, by, now) => db.prepare(
 export async function requireModule(db) {
   const on = await retry(() => db.prepare("SELECT value FROM settings WHERE key = 'BREAD_MODULE'").first('value'));
   if (on !== '1') throw new ApiError('disabled', 'BREAD_MODULE');
+}
+
+/* P5: «مناسبات كنيستنا» on the member page: off → `disabled` (the page shows no card, no «كنيستنا» tab) */
+export async function requireOccasions(db) {
+  const on = await retry(() => db.prepare("SELECT value FROM settings WHERE key = 'BREAD_OCCASIONS'").first('value'));
+  if (on !== '1') throw new ApiError('disabled', 'BREAD_OCCASIONS');
 }
 
 /* programs that can be live now or later (dated): small, read whole */

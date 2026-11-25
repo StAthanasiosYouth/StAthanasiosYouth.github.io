@@ -2,6 +2,7 @@
  * «خبزنا اليومي» — the member's routes (PLAN.md W3, STUDY §5, §7). All answer `disabled` while BREAD_MODULE ≠ '1'.
  *
  *   GET  /v1/bread/file/index · GET /v1/bread/file/:program/:n   the published files (the same text as GitHub Pages)
+ *   GET  /v1/bread/file/occasions   P5 «مناسبات كنيستنا»: also `disabled` while BREAD_OCCASIONS ≠ '1'
  *   POST /v1/bread/today      { seed }            today for this seed (signed in: the account's kept seed)
  *   POST /v1/bread/open       { seed, kind }      'open' | 'read' («قريت»): counted once a device a day, nothing more
  *   POST /v1/bread/slots      { token, seed, times? }   «فكّرني»: up to bread_max_slots 'HH:MM' (Cairo); [] = off;
@@ -24,7 +25,7 @@ import { requireAccount } from '../account/session.js';
 import { gate } from '../account/routes.js';
 import { eligibility, rulesFrom } from '../account/model.js';
 import { cairoDay, currentOf, nextOf, topicFor, minuteOf, timeOf, SEED, PROGRAM_ID, LIMITS } from './model.js';
-import { requireModule, datedPrograms, breadSettings } from './store.js';
+import { requireModule, requireOccasions, datedPrograms, breadSettings } from './store.js';
 
 export const EDIT_MS = 20 * 60000;
 const TOKEN = /^(?:[\w:-]{100,400}|[\w-]{22})$/;
@@ -49,6 +50,11 @@ async function serveFile(ctx, key) {
 }
 
 export const breadFileIndex = ctx => serveFile(ctx, 'index');
+/* P5: the occasions file (published with the saints registry); its own switch on top of the section's */
+export async function breadFileOccasions(ctx) {
+  await requireOccasions(ctx.env.DB);
+  return serveFile(ctx, 'occasions');
+}
 export async function breadFileFeasts(ctx) {
   const { month } = ctx.params;
   if (!/^20\d\d-(0[1-9]|1[0-2])$/.test(String(month))) throw new ApiError('not_found', 'bread');
