@@ -55,15 +55,18 @@ try {
   const hist = await admin('GET', 'bread/saints/history');
   base = hist.body.publishes.length ? hist.body.publishes[0].rev : null;
   const rv = await admin('GET', 'bread/saints/review');
-  check('review: no problems; the 16 occasions and Abu Sefein in the changes', rv.status === 200 && rv.body.errors.length === 0 && rv.body.changes.filter(c => c.kind === 'occasion').length >= 15 && rv.body.changes.some(c => c.id === 'mercurius'), rv.body.errors || rv.body);
+  const again = !rv.body.changes.length;   // a second run: the P5 publish is already on Staging
+  check('review: no problems' + (again ? ' (already published)' : '; the 16 occasions and Abu Sefein in the changes'), rv.status === 200 && rv.body.errors.length === 0 && (again || (rv.body.changes.filter(c => c.kind === 'occasion').length >= 15 && rv.body.changes.some(c => c.id === 'mercurius'))), rv.body.errors || rv.body);
   console.log('     review: ' + rv.ms + ' ms');
-  const pub = await admin('POST', 'bread/saints/publish', { expect: rv.body.expect });
-  check('publish → saints.json + occasions.json', pub.status === 200, pub.body);
-  console.log('     publish: ' + pub.ms + ' ms (rev ' + (pub.body && pub.body.rev) + ')');
+  if (!again) {
+    const pub = await admin('POST', 'bread/saints/publish', { expect: rv.body.expect });
+    check('publish → saints.json + occasions.json', pub.status === 200, pub.body);
+    console.log('     publish: ' + pub.ms + ' ms (rev ' + (pub.body && pub.body.rev) + ')');
+  }
   const occ = sql("SELECT length(body) AS n, body FROM published_revisions WHERE kind = 'bread' AND key = 'occasions' AND live = 1")[0];
   const file = JSON.parse(occ.body);
   check('occasions.json: 16, the two patrons, small, nothing internal', file.occasions.length === 16 && file.patrons.patron && file.patrons.family && occ.n < 30000 && !/"src"|"credit"|"pending"/.test(occ.body), { n: occ.n, len: file.occasions.length });
-  check('a mirror job for each file', sql("SELECT COUNT(*) AS n FROM publish_jobs WHERE mode = 'bread' AND created_at >= " + (Date.now() - 600000))[0].n >= 2);
+  if (!again) check('a mirror job for each file', sql("SELECT COUNT(*) AS n FROM publish_jobs WHERE mode = 'bread' AND created_at >= " + (Date.now() - 600000))[0].n >= 2);
 
   const off = await call('GET', '/v1/bread/file/occasions');
   check('public file: `disabled` while the switches are off', off.body && off.body.code === 'disabled', off.body);
@@ -79,6 +82,12 @@ try {
   check('save an occasion (from a person\'s day)', s.status === 200 && s.body.item.state === 'changed', s.body);
   const bad = await admin('POST', 'bread/saints/item', { kind: 'occasion', rev: 0, item: { id: 'stagingx', name: 'x', type: 'fathers', from: { person: 'ibrahimisravim', feast: 'مش موجود' }, headline: 'x' } });
   check('a link to a missing day is refused', bad.status === 400, bad.body);
+  // owner 2026-11-25: «من غير مصدر مكتوب» (source owner) is saved; nothing at all is refused with the reason
+  const own = await admin('POST', 'bread/saints/item', { kind: 'occasion', rev: 0, item: { id: 'stagingowner', name: 'x', type: 'fathers', gregorian: '06-06', source: 'owner', headline: 'النهارده (فحص Staging)' } });
+  check('«من غير مصدر مكتوب» saved', own.status === 200, own.body);
+  const none = await admin('POST', 'bread/saints/item', { kind: 'occasion', rev: 0, item: { id: 'stagingnone', name: 'x', gregorian: '06-06', headline: 'x' } });
+  check('no source at all: refused with the reason', none.status === 400 && /المصدر/.test(JSON.stringify(none.body)), none.body);
+  if (own.status === 200) check('the test occasion removed', (await admin('POST', 'bread/saints/item/delete', { kind: 'occasion', id: 'stagingowner', rev: own.body.item.rev })).status === 200);
 } finally {
   // the test edit back («رجّع» = the published version); the P5 publish itself stays on Staging (the seed is what the
   // owner looks at there; a restore to the publish before would drop the 0037 seed from the drafts). base: for the log.
