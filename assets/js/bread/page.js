@@ -18,7 +18,7 @@ import { stripTashkeel, agpeyaPsalm } from './text.js';
 import { parseRef, taklaUrl } from './refs.js';
 import { AR, cairoDay, programsOn, dayOf, dateText, clock, bareName, mmss, newSeed, SEED, dayDiff, feastOn, TAKLA_URL as TAKLA } from './model.js';
 import { loadIndex, loadDay, loadFeasts, loadOccasions, beacon, session, me, reflect, reflectEdit, reflectDelete, saveLook } from './api.js';
-import { occasionsOnDay, feastHidden, nextDate } from './occasions.js';
+import { occasionsOnDay, feastHidden, nextDate, cleanOccasions } from './occasions.js';
 import { occasionCard, churchScreen, praiseSheet, viewerHtml, paintFrames } from './occasions-view.js';
 import { readFace, RETURN_KEY, FROM_KEY } from '../account/link.js';
 import { soundEnabled, setSoundEnabled } from '../sound.js';
@@ -839,4 +839,23 @@ function registerOffline() {
   }).catch(() => { /* the reading still works online */ });
 }
 
-boot();
+/*
+ * P5: «شوف الكارت» in the admin (?preview=occ): the admin's draft occasion comes by postMessage from the same origin
+ * only, and the card is drawn on this page's own CSS, on that day — nothing is loaded, counted or remembered.
+ */
+function previewMode() {
+  html.classList.remove('has-tabbar');
+  if (cover) cover.remove();
+  app.innerHTML = '<main id="main" aria-busy="true"></main>';
+  addEventListener('message', e => {
+    if (e.origin !== location.origin || !e.data || e.data.type !== 'bread:occ-preview') return;
+    const file = cleanOccasions(e.data.file);
+    const day = /^\d{4}-\d{2}-\d{2}$/.test(e.data.day || '') ? e.data.day : S.day;
+    if (!file || !file.occasions.length) return;
+    S.occ = file; S.day = day; S.view = 'rest';
+    app.innerHTML = `<div class="backdrop" aria-hidden="true"><div class="backdrop__glow"></div><div class="backdrop__lattice"></div></div><main id="main" class="br-preview-occ"><section class="br-dawn br-dawn--rest"><span class="br-dawn__rays" aria-hidden="true"></span>${occasionCard(file.occasions, day, { file, medText, open: true })}${HILLS}</section></main>`;
+    paintFrames(app);
+  });
+}
+
+if (q0.get('preview') === 'occ') previewMode(); else boot();

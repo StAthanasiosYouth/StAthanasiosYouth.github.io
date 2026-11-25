@@ -234,15 +234,23 @@ test('an occasion one time; the person page and the list on a phone (390) withou
   await shot(d.page, '10-occasions-d');
   await d.page.click('[data-act="saints-newocc"]');
   await d.page.waitForSelector('dialog .sa-live');
-  await d.page.type('dialog [data-field="name"]', 'زيارة الأسقف');
-  await d.page.evaluate(() => { document.querySelectorAll('dialog .seg')[0].querySelectorAll('input')[1].click(); document.querySelectorAll('dialog .seg')[1].querySelectorAll('input')[1].click(); });
-  await d.page.evaluate(() => { const s = document.querySelectorAll('dialog .sa-three select'); s[0].value = '3'; s[0].dispatchEvent(new Event('change', { bubbles: true })); s[1].value = '5'; s[1].dispatchEvent(new Event('change', { bubbles: true })); });
+  // P5's form: the title, the type, the day (a person's day / every year / once), then the date and its source
+  await d.page.$eval('dialog [data-field="headline"]', i => { i.value = ''; });
+  await d.page.type('dialog [data-field="headline"]', 'النهارده زيارة الأسقف');
+  await d.page.evaluate(() => {
+    const segs = document.querySelectorAll('dialog .seg');
+    segs[0].querySelectorAll('input')[2].click();        // النوع: إيبارشيتنا
+    segs[1].querySelectorAll('input')[2].click();        // اليوم: مرة واحدة
+    segs[2].querySelectorAll('input')[1].click();        // التقويم: ميلادي
+  });
+  await d.page.evaluate(() => { const s = document.querySelectorAll('dialog .sa-three:not(.oca-two) select'); s[0].value = '3'; s[0].dispatchEvent(new Event('change', { bubbles: true })); s[1].value = '5'; s[1].dispatchEvent(new Event('change', { bubbles: true })); });
   await d.page.type('dialog [data-field="year"]', '2027');
   await d.page.type('dialog [data-field="source"]', 'https://example.org/news');
   await d.page.evaluate(() => [...document.querySelectorAll('dialog .modal__actions .btn')].pop().click());
-  await d.page.waitForFunction(() => document.querySelectorAll('[data-occasion]').length === 2, { timeout: 8000 });
+  await d.page.waitForFunction(() => document.querySelectorAll('[data-occasion]').length === 17, { timeout: 8000 });
   const o = fake.state.saints.items.find(r => r.kind === 'occasion' && r.data.name === 'زيارة الأسقف').data;
-  assert.deepEqual([o.repeat, o.date], ['once', '2027-03-05']);
+  assert.ok(await d.page.$('[data-occasion] .oca-row__main'), 'the P5 list');
+  assert.deepEqual([o.repeat, o.date, o.type, o.headline], ['once', '2027-03-05', 'diocese', 'النهارده زيارة الأسقف']);
   await d.context.close();
 
   const m = await open({ viewport: PHONE });
@@ -261,3 +269,50 @@ test('an occasion one time; the person page and the list on a phone (390) withou
   await m.context.close();
 });
 
+
+test('P5 «مناسبات كنيستنا»: the 16 by the next date, the type filter, «من يوم شخص», «بتغطّي», «شوف الكارت» (the member page itself), the phone', async () => {
+  freshWorker();
+  const d = await open();
+  await go(d.page, 'breadoccasions');
+  await d.page.waitForSelector('.oca-list', { timeout: 8000 });
+  assert.equal(await d.page.$$eval('.oca-list > li', n => n.length), 16);
+  assert.ok(await d.page.$('.oca-soon li'), '«الجاي»');
+  assert.ok(await d.page.$('.oca-rules'), 'the no-repeat rules');
+  assert.match(await d.page.$eval('[data-occasion="redseadiocese"]', n => n.textContent), /بيغطّي «تذكار رسامته»/);
+  assert.match(await d.page.$eval('[data-occasion="abusefeinmartyrdom"]', n => n.textContent), /من «استشهاده»/);
+  await shot(d.page, '20-occasions-d');
+  // the type filter: our patron's three days
+  await d.page.evaluate(() => { const seg = document.querySelector('.oca-filters .seg'); [...seg.querySelectorAll('input')].find(i => i.value === 'patron').click(); });
+  await d.page.waitForFunction(() => document.querySelectorAll('.oca-list > li').length === 3, { timeout: 5000 });
+  // the form: a person's day, its pictures, saved as it was
+  await d.page.evaluate(() => [...document.querySelectorAll('[data-occasion="abusefeinmartyrdom"] .btn')].pop().click());
+  await d.page.waitForSelector('dialog .oca-pick');
+  assert.equal(await d.page.$eval('dialog [data-field="headline"]', i => i.value), 'النهارده عيد استشهاد شفيع كنيستنا');
+  await shot(d.page, '21-occasion-edit-d');
+  await d.page.evaluate(() => [...document.querySelectorAll('dialog .modal__actions .btn')].pop().click());
+  await d.page.waitForFunction(() => !document.querySelector('dialog[open] .oca-pick'), { timeout: 5000 });
+  await sleep(500);
+  const saved = fake.state.saints.items.find(r => r.id === 'abusefeinmartyrdom').data;
+  assert.deepEqual(saved.from, { person: 'mercurius', feast: 'استشهاده' });
+  assert.equal(saved.type, 'patron');
+  // «شوف الكارت»: the member page in a frame, the draft sent to it
+  await d.page.evaluate(() => { [...document.querySelector('.oca-filters .seg').querySelectorAll('input')].find(i => i.value === '').click(); });
+  await d.page.waitForFunction(() => document.querySelectorAll('.oca-list > li').length === 16, { timeout: 5000 });
+  await d.page.evaluate(() => document.querySelector('[data-occasion="ordination2021"] .oca-row__acts .btn').click());
+  await d.page.waitForSelector('dialog iframe.oca-frame');
+  const frame = await (await d.page.$('dialog iframe.oca-frame')).contentFrame();
+  await frame.waitForSelector('.oc', { timeout: 15000 });
+  assert.match(await frame.$eval('.oc__title', n => n.textContent), /أنجيلوس/);
+  assert.equal(await frame.$$eval('.oc__pics--duo figure', n => n.length), 2, 'two fathers, two arches');
+  await shot(d.page, '22-occasion-card-d');
+  assert.deepEqual(d.problems, []);
+  await d.context.close();
+
+  const m = await open({ viewport: PHONE });
+  await go(m.page, 'breadoccasions');
+  await m.page.waitForSelector('.oca-list');
+  assert.equal(await sideScroll(m.page), false, 'the occasions on a phone');
+  await shot(m.page, '20-occasions-m');
+  assert.deepEqual(m.problems, []);
+  await m.context.close();
+});

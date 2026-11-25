@@ -16907,3 +16907,69 @@ html[data-mode="light"] .sa-viewbar { background: rgb(255 255 255 / .92); }
 .sa-checks--bad .ico-sm { color: rgb(var(--danger-rgb)); }
 .sa-table tbody tr:focus-visible td { outline: 2px solid rgb(var(--acc-rgb) / .6); outline-offset: -2px; }
 
+
+/* ============================================================
+   DAILY BREAD — P5 OCCASIONS «مناسبات كنيستنا» (apps-script/AdminSaints.html «المناسبات»; the approved preview
+   docs/daily-bread/saints/p5/p5-admin.css, owner 2026-11-25, unchanged)
+   ============================================================ */
+.oca-filters { margin-bottom: 14px; }
+.oca-filters .seg { flex-wrap: wrap; }
+.oca-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.oca-row { display: grid; grid-template-columns: 118px minmax(0, 1fr) auto; grid-template-areas: "when main pics" "when acts acts"; gap: 10px 14px; align-items: start; padding: 14px; border: 1px solid var(--p-line-2); border-radius: 14px; background: rgb(10 33 64 / .35); }
+.oca-row > .sa-day__date { grid-area: when; }
+.oca-row__main { grid-area: main; display: grid; gap: 6px; min-width: 0; }
+.oca-row__head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.oca-row__head b { font-size: 1rem; }
+.oca-lead { color: var(--text-3); line-height: 1.7; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.oca-row__pics { grid-area: pics; display: flex; }
+.oca-row__pics .oca-thumb + .oca-thumb { margin-inline-start: -14px; }
+.oca-row__acts { grid-area: acts; display: flex; gap: 8px; justify-content: flex-end; }
+.oca-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.oca-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 99px; font-size: .78rem; color: var(--text-2); background: rgb(var(--acc-rgb) / .07); border: 1px solid rgb(var(--acc-rgb) / .22); line-height: 1.6; }
+.oca-chip small { color: var(--text-3); }
+.oca-chip .ico-sm svg, .oca-chip > svg { width: 14px; height: 14px; }
+.oca-chip--cover { background: rgb(var(--ok-rgb) / .08); border-color: rgb(var(--ok-rgb) / .3); }
+.oca-x { display: inline-grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 99px; background: none; color: var(--text-3); cursor: pointer; }
+.oca-x svg { width: 12px; height: 12px; }
+/* the album's arch, small (the same shape as the member card and P3's large view) */
+.oca-thumb { position: relative; display: inline-block; flex: none; width: 46px; height: 58px; border-radius: 99px 99px 10px 10px; overflow: hidden; border: 1.5px solid rgb(var(--gold-hi-rgb, 242 210 139) / .7); background: #0b2140; box-shadow: 0 6px 14px -6px rgb(0 0 0 / .7); }
+.oca-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.oca-thumb--n { display: inline-grid; place-items: center; font-size: .8rem; font-weight: 800; color: var(--gold); }
+.oca-thumb--sm { width: 38px; height: 48px; }
+.oca-soon { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.oca-soon li { display: flex; gap: 12px; align-items: center; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--p-line-2); background: rgb(10 33 64 / .35); }
+.oca-soon li span { display: grid; gap: 2px; min-width: 0; }
+.oca-soon small { color: var(--text-3); font-size: .8rem; }
+.oca-soon li.is-near { border-color: rgb(var(--acc-rgb) / .55); }
+.oca-soon li.is-near small { color: var(--gold); }
+.oca-rules { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.oca-rules li { display: flex; gap: 8px; align-items: flex-start; line-height: 1.7; color: var(--text-2); font-size: .9rem; }
+.oca-rules .ico-sm { color: rgb(var(--ok-rgb)); margin-top: 4px; }
+.oca-waitcard { border-color: rgb(var(--warn-rgb) / .3); }
+.oca-wait { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.oca-wait li { display: grid; gap: 3px; padding: 10px 12px; border-radius: 12px; background: rgb(var(--warn-rgb) / .05); border: 1px solid var(--p-line-2); }
+.oca-wait small { color: var(--text-3); line-height: 1.6; }
+/* the form */
+.oca-modal { width: min(96vw, 720px); }
+.oca-two { grid-template-columns: 1fr 1fr; }
+.oca-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+.oca-pickpic { position: relative; display: grid; justify-items: center; gap: 6px; padding: 10px 6px 8px; border: 1px solid var(--p-line-2); border-radius: 14px; background: rgb(10 33 64 / .35); color: var(--text-2); font: inherit; cursor: pointer; }
+.oca-pickpic .oca-thumb { width: 64px; height: 80px; }
+.oca-pickpic small { font-size: .7rem; line-height: 1.4; color: var(--text-3); text-align: center; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.oca-pickpic.is-on { border-color: rgb(var(--acc-rgb) / .8); box-shadow: inset 0 0 0 1px rgb(var(--acc-rgb) / .5); background: rgb(var(--acc-rgb) / .08); }
+.oca-pickpic__n { position: absolute; top: 6px; inset-inline-start: 6px; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 99px; font-size: .76rem; font-weight: 800; color: #1b1206; background: var(--gold); }
+.oca-pickpic__ai { position: absolute; top: 6px; inset-inline-end: 6px; padding: 0 6px; border-radius: 99px; font-size: .62rem; background: rgb(0 0 0 / .5); color: #fff8ea; }
+.oca-pickpic--add { align-content: center; border-style: dashed; color: var(--gold); }
+.oca-pickpic--add svg { width: 26px; height: 26px; }
+.oca-del { margin-inline-end: auto; }
+.oca-modal--card { width: min(96vw, 460px); }
+.oca-phone { margin: 0 auto; width: 390px; max-width: 100%; height: min(70vh, 700px); border-radius: 26px; overflow: hidden; border: 6px solid #0d1726; box-shadow: 0 20px 50px -20px rgb(0 0 0 / .8); }
+.oca-phone iframe { width: 100%; height: 100%; border: 0; display: block; }
+@media (max-width: 720px) {
+  .oca-row { grid-template-columns: 92px minmax(0, 1fr); grid-template-areas: "when pics" "main main" "acts acts"; }
+  .oca-row__pics { justify-self: end; }
+  .oca-row__acts .btn { flex: 1; }
+  .oca-two { grid-template-columns: 1fr; }
+  .oca-modal .modal__actions { flex-wrap: wrap; }
+}
+.oca-row__head .p8-tag { flex: none; }

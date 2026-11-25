@@ -29077,7 +29077,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       el('div', { class: 'ba-actions' }, toggle, el('span', { class: 'sp' }),
         same ? tag(on.length ? 'اتنشرت ✓' : 'اتنشرت فاضية: مفيش عيد ظاهر', 'ok') : st.published !== null ? tag('فيه تعديل مش منشور', 'warn') : null,
         btn(label, 'check', 'btn--primary btn--sm', { 'data-act': 'bread-feasts', disabled: same || (st.published === null && !on.length), onclick: function (event) {
-          var body = { month: month, feasts: on.map(function (f) { return { date: f.date, name: f.name, title: f.title || undefined, word: f.word, url: f.sourceUrl, img: f.img || undefined, imgAi: f.img && f.imgAi ? true : undefined, praise: f.praise || undefined, praiseTitle: f.praiseText ? f.praiseTitle || undefined : undefined, praiseText: f.praiseText || undefined }; }) };
+          var body = { month: month, feasts: on.map(function (f) { return { date: f.date, name: f.name, title: f.title || undefined, word: f.word, url: f.sourceUrl, img: f.img || undefined, imgAi: f.img && f.imgAi ? true : undefined, praise: f.praise || undefined, praiseTitle: f.praiseText ? f.praiseTitle || undefined : undefined, praiseText: f.praiseText || undefined, person: f.id || undefined, kind: f.id ? f.kind || undefined : undefined }; }) };
           A.withBusy(event.currentTarget, api('POST', 'feasts', body).then(function () { st.published = key; A.toast('اتنشرت أعياد ' + monthName(month)); A.render(); })).catch(function (error) { A.fail(error); });
         } }))
     ]);
@@ -30954,82 +30954,227 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   }
 
   /* =======================================================
-     المناسبات
+     المناسبات — P5 «مناسبات كنيستنا» (docs/daily-bread/saints/P5-PLAN.md §4, the approved preview p5/admin.html):
+     the list by the next date, a filter by type, «من يوم في السجل» / «بتغطّي», the pictures, «شوف الكارت» (the
+     member page itself, on that day), «الجاي», the no-repeat rules, «مستنية تاريخ كامل».
   ======================================================= */
+  var OCC_TYPES = [['patron', 'شفيع كنيستنا'], ['family', 'شفيع أسرتنا'], ['diocese', 'إيبارشيتنا وآباؤها الأساقفة'], ['fathers', 'آباء كنيستنا'], ['church', 'تاريخ كنيستنا'], ['local', 'تذكار عندنا']];
+  var OCC_TONE = { patron: 'warn', family: 'info', diocese: 'info', fathers: 'ok', church: 'acc', local: 'acc' };
+  function typeName(t) { var x = OCC_TYPES.filter(function (o) { return o[0] === t; })[0]; return x ? x[1] : 'مناسبة'; }
+  function personOf(id) { var it = people().filter(function (i) { return i.id === id; })[0]; return it ? it.data : null; }
+  /* the day an occasion keeps: its own, or the person's day (from) */
+  function occDay(o) {
+    if (!o.from) return o;
+    var p = personOf(o.from.person), f = p && (p.feasts || []).filter(function (x) { return x.kind === o.from.feast; })[0];
+    return f ? Object.assign({}, f, { source: o.source || f.source }) : null;
+  }
+  function cairoToday() { return today(); }
+  function daysTo(iso) { return Math.round((Date.parse(iso) - Date.parse(cairoToday())) / 864e5); }
+  function soonText(n) { return n === 0 ? 'النهارده' : n === 1 ? 'بكره' : n < 11 ? 'بعد ' + ar(n) + ' أيام' : 'بعد ' + ar(n) + ' يوم'; }
+  function nextOcc(o) { var f = occDay(o); if (!f) return null; return f.repeat === 'once' ? (f.date >= cairoToday() ? f.date : null) : nextOf(f); }
+  /* an occasion's pictures, small, in the album's own arch */
+  function occThumb(media, cls) {
+    var img = cropImg({ media: media, crop: albumCrop(media) });
+    return el('span', { class: 'oca-thumb' + (cls ? ' ' + cls : ''), 'aria-hidden': 'true' }, img || icon('photos'));
+  }
+  function albumOf(media) {
+    var hit = null;
+    people().forEach(function (i) { (i.data.album || []).forEach(function (a) { if (a.media === media) hit = a; }); });
+    return hit;
+  }
+  function albumCrop(media) { var a = albumOf(media); return a && a.crop; }
+  function occName(o) { return String(o.headline || o.name || '').replace(/^النهارده /, ''); }
+
   A.views.breadoccasions = function () {
     var r = K.root();
     r.classList.add('sa');
     if (gateView(r, 'المناسبات')) return [r];
     r.append(dirtyBar() || el('span', { hidden: true }));
-    var occ = occasions();
-    var church = K.card('church', 'مناسبات الكنيسة', 'أيام مش لشخص: الإيبارشية، والكنيسة، وأي مناسبة. كل سنة أو مرة واحدة', K.btn('مناسبة جديدة', 'plus', 'btn--primary', { 'data-act': 'saints-newocc', onclick: function () { occModal(null); } }),
-      occ.length ? el('ul', { class: 'sa-days' }, occ.map(function (it) {
-        var o = it.data, once = o.repeat === 'once', at = nextOf(o), c = toCoptic(at);
-        return el('li', { class: 'sa-day', 'data-occasion': o.id },
-          el('span', { class: 'sa-day__date' }, el('b', { text: dayLabel(o) }), el('small', { text: once ? 'مرة واحدة' : (o.coptic ? 'قبطي' : 'ميلادي') + ' · كل سنة' + (o.year ? ' · من ' + ar(o.year) : '') })),
-          el('span', { class: 'sa-day__main' }, el('b', { text: o.name }), o.kind ? el('small', { class: 'sa-kind', text: o.kind }) : null,
-            el('span', { class: 'sa-conv' }, icon('swap'), el('span', { text: once ? cText(c.m, c.d, c.y) : o.coptic ? gText(at, true) : cText(c.m, c.d) })),
-            linkLine(o.source)),
-          K.tag(once ? 'مرة واحدة' : 'كل سنة', once ? 'acc' : 'info'), it.state !== 'published' ? K.tag('مش منشور', 'warn') : null,
-          K.btn('عدّل', 'edit', 'btn--sm btn--ghost', { onclick: function () { occModal(it); } }));
-      })) : el('p', { class: 'muted sa-pad', text: 'مفيش مناسبات.' }));
-    var living = people().map(function (i) { return i.data; }).filter(function (p) { return p.class === 'living'; });
-    var fathers = K.card('users', 'أيام الآباء الأحياء', 'بتتعدّل من صفحة كل أب. بتظهر هنا علشان تشوف المناسبات كلها مع بعض', null,
-      el('ul', { class: 'sa-days' }, living.reduce(function (acc, p) {
-        return acc.concat(p.feasts.map(function (f) {
-          return el('li', { class: 'sa-day' }, el('span', { class: 'sa-day__date' }, el('b', { text: dayLabel(f) }), el('small', { text: (f.coptic ? 'قبطي' : 'ميلادي') + (f.year ? ' · من ' + ar(f.year) : '') })),
-            el('span', { class: 'sa-day__main' }, el('b', { text: p.name }), el('small', { class: 'sa-kind', text: f.kind })),
-            K.btn('افتح', 'chevron', 'btn--sm btn--ghost', { onclick: function () { A.sub.bread = 'breadpeople'; openPerson(p.id); A.go('bread', 'breadpeople'); } }));
-        }));
-      }, [])));
-    var months = [K.cairoMonth(1), K.cairoMonth(2)].map(function (ym) {
-      var l = monthOcc(ym, living, occ.map(function (i) { return i.data; }));
-      return el('div', { class: 'sa-month' }, el('b', { text: K.monthName(ym) }),
-        l.length ? el('ul', {}, l.map(function (x) { return el('li', {}, el('span', { text: ar(+x.date.slice(8)) + ' ' + GM[+x.date.slice(5, 7) - 1] }), el('span', {}, x.who, el('small', { text: x.what }))); }))
-          : el('small', { class: 'muted', text: 'مفيش مناسبات' }));
+    var all = occasions().map(function (it) { return { it: it, o: it.data, at: nextOcc(it.data) }; });
+    var f = SA.occF || '';
+    var shown = all.filter(function (x) { return !f || x.o.type === f; }).sort(function (a, b) { return (a.at || '9') < (b.at || '9') ? -1 : 1; });
+    var count = function (t) { return all.filter(function (x) { return x.o.type === t; }).length; };
+    var filters = el('div', { class: 'oca-filters' }, seg('النوع', [['', 'الكل (' + ar(all.length) + ')']].concat(OCC_TYPES.filter(function (t) { return count(t[0]); }).map(function (t) { return [t[0], t[1] + ' (' + ar(count(t[0])) + ')']; })), f, function (v) { SA.occF = v; A.render(); }));
+    var list = K.card('church', 'مناسبات كنيستنا', 'كارت مميز فوق أول اليوم للكل. كل سنة (قبطي أو ميلادي) أو مرة واحدة، أو من يوم شخص في السجل', K.btn('مناسبة جديدة', 'plus', 'btn--primary', { 'data-act': 'saints-newocc', onclick: function () { occModal(null); } }),
+      el('div', {}, filters, shown.length ? el('ul', { class: 'oca-list' }, shown.map(occRow)) : el('p', { class: 'muted sa-pad', text: 'مفيش مناسبات.' })));
+    // «مستنية تاريخ كامل»: the living fathers' steps known by the month or the year only (never a card until a full day)
+    var wait = [];
+    people().forEach(function (i) {
+      var p = i.data;
+      if (p.class !== 'living') return;
+      (p.milestones || []).forEach(function (m) { if (!m.date && (m.month || m.year)) wait.push({ what: m.kind + ' · ' + p.name, known: m.month ? GM[+m.month.slice(5) - 1] + ' ' + ar(m.month.slice(0, 4)) : ar(m.year) }); });
     });
-    r.append(K.cols('sa-cols', K.stack(church, fathers), K.stack(K.card('calendar', 'الجاي', 'اللي هيظهر في «مناسبات كنيستنا» (P5) بعد النشر', null, el('div', { class: 'sa-months' }, months)),
-      K.note('info', 'أيام الآباء الأحياء ومناسبات الكنيسة مكانها «مناسبات كنيستنا» بس، وعمرها ما بتظهر في كارت القديسين.'))));
+    var waiting = K.card('clock', 'مستنية تاريخ كامل', 'مبتظهرش على الموقع لحد ما يبقى ليها يوم كامل بمصدر', null,
+      wait.length ? el('ul', { class: 'oca-wait' }, wait.map(function (w) { return el('li', {}, el('b', { text: w.what }), el('small', { text: 'معروف: ' + w.known + ' · اليوم بالظبط لسه' })); })) : el('p', { class: 'muted sa-pad', text: 'مفيش.' }), 'oca-waitcard');
+    var next = all.filter(function (x) { return x.at; }).sort(function (a, b) { return a.at < b.at ? -1 : 1; }).slice(0, 7);
+    var soon = K.card('calendar', 'الجاي', 'اللي هيظهر فوق أول اليوم في «خبزنا اليومي»', null,
+      el('ol', { class: 'oca-soon' }, next.map(function (x) {
+        var n = daysTo(x.at), pic = (x.o.pictures || [])[0];
+        return el('li', { class: n <= 7 ? 'is-near' : '' }, pic ? occThumb(pic.media, 'oca-thumb--sm') : null, el('span', {}, el('b', { text: occName(x.o) }), el('small', { text: gText(x.at, true) + ' · ' + soonText(n) })));
+      })));
+    var rules = K.card('shield', 'من غير تكرار', null, null, el('ul', { class: 'oca-rules' },
+      ['يوم واحد = كارت واحد. لو مناسبتين في نفس اليوم بيتجمعوا في نفس الكارت.',
+        'يوم الشخص اللي المناسبة «من يومه» أو «بتغطّيه» مبيظهرش في «نحب نفكّرك» اليوم ده. مثال: ١٤ يونيو = عيد الإيبارشية بس، و«نحب نفكّرك» بيكمّل بشهيد اليوم.',
+        'أبي سيفين والبابا أثناسيوس: كارت واحد لكل واحد، فيه كلمة السنكسار والتمجيد وأيامه.',
+        'الآباء الأحياء هنا بس، عمرهم ما بيظهروا في كارت القديسين.'].map(function (t) { return el('li', {}, el('span', { class: 'ico-sm', 'aria-hidden': 'true' }, icon('check')), el('span', { text: t })); })));
+    r.append(K.cols('sa-cols oca-cols', K.stack(list, waiting), K.stack(soon, rules, K.note('bell', 'الإشعارات التلقائية للمناسبات في P6: كل مناسبة هنا هيبقى ليها ميعاد ووقف من نفس الصف.'))));
     return [r];
   };
 
-  function monthOcc(ym, living, occ) {
-    var y = +ym.slice(0, 4), mo = +ym.slice(5, 7), last = new Date(Date.UTC(y, mo, 0)).getUTCDate(), out = [];
-    for (var d = 1; d <= last; d++) {
-      var date = ym + '-' + (d < 10 ? '0' : '') + d, c = toCoptic(date);
-      var on = function (f) { return f.repeat === 'once' ? f.date === date : f.gregorian ? f.gregorian === date.slice(5) : f.coptic === c.m + '-' + c.d || (f.coptic === '13-6' && c.m === 13 && c.d === 5 && monthDays(c.y, 13) === 5); };
-      living.forEach(function (p) { if (p.status === 'complete' || p.feasts.length) p.feasts.forEach(function (f) { if (on(f)) out.push({ date: date, who: p.name, what: f.kind }); }); });
-      occ.forEach(function (o) { if (on(o)) out.push({ date: date, who: o.name, what: o.kind || '' }); });
-    }
-    return out;
+  function occRow(x) {
+    var o = x.o, it = x.it, f = occDay(o), at = x.at;
+    if (!f) return el('li', { class: 'oca-row', 'data-occasion': o.id }, el('span', { class: 'sa-day__date' }, el('b', { text: '—' })), el('span', { class: 'oca-row__main' }, el('b', { text: occName(o) }), el('small', { class: 'oca-lead', text: 'اليوم اللي جاية منه مش موجود في السجل.' })), el('span', { class: 'oca-row__acts' }, K.btn('عدّل', 'edit', 'btn--sm btn--ghost', { onclick: function () { occModal(it); } })));
+    var once = f.repeat === 'once', c = at ? toCoptic(at) : null;
+    var chips = el('span', { class: 'oca-chips' },
+      o.from ? el('span', { class: 'oca-chip' }, icon('link'), el('span', { text: 'من «' + o.from.feast + '» · ' + ((personOf(o.from.person) || {}).name || o.from.person) })) : null,
+      (o.covers || []).filter(function (cv) { return !(o.from && cv.person === o.from.person); }).map(function (cv) { return el('span', { class: 'oca-chip oca-chip--cover' }, icon('check'), el('span', { text: 'بيغطّي «' + cv.feast + '» · ' + ((personOf(cv.person) || {}).name || cv.person) })); }),
+      at ? el('span', { class: 'oca-chip' }, icon('swap'), el('span', { text: (f.coptic ? gText(at, true) : cText(c.m, c.d)) + ' (' + soonText(daysTo(at)) + ')' })) : null);
+    return el('li', { class: 'oca-row', 'data-occasion': o.id },
+      el('span', { class: 'sa-day__date' }, el('b', { text: once ? gText(f.date) : dayLabel(f) }), el('small', { text: o.from ? (f.coptic ? 'قبطي' : 'ميلادي') + ' · من يوم في السجل' : once ? 'مرة واحدة' : (f.coptic ? 'قبطي' : 'ميلادي') + ' · كل سنة' + (f.year ? ' · من ' + ar(f.year) : '') })),
+      el('span', { class: 'oca-row__main' }, el('span', { class: 'oca-row__head' }, el('b', { text: occName(o) }), K.tag(typeName(o.type), OCC_TONE[o.type] || 'info'), it.state !== 'published' ? K.tag('مش منشور', 'warn') : null),
+        o.lead ? el('small', { class: 'oca-lead', text: o.lead }) : null, chips),
+      el('span', { class: 'oca-row__pics' }, (o.pictures || []).slice(0, 3).map(function (p) { return occThumb(p.media); }), (o.pictures || []).length > 3 ? el('span', { class: 'oca-thumb oca-thumb--n', text: '+' + ar(o.pictures.length - 3) }) : null),
+      el('span', { class: 'oca-row__acts' }, K.btn('شوف الكارت', 'eye', 'btn--sm btn--ghost', { onclick: function () { occPreview(o, at); } }), K.btn('عدّل', 'edit', 'btn--sm btn--ghost', { onclick: function () { occModal(it); } })));
   }
 
+  /*
+   * «شوف الكارت»: the member page itself (/daily-bread/?preview=occ), on a phone, on that day — the draft is sent to it
+   * by postMessage (same origin only), so the card is seen as it will be before anything is published.
+   */
+  function occEntry(o) {
+    var f = occDay(o);
+    if (!f) return null;
+    var lead = o.from ? personOf(o.from.person) : (o.people || []).length === 1 ? personOf(o.people[0]) : null;
+    var names = (o.people || (o.from ? [o.from.person] : [])).map(personOf).filter(Boolean).map(function (p) { return p.name; });
+    var x = { id: o.id, type: o.type || 'church', headline: o.headline || o.name, who: lead ? (o.honor ? o.honor + ' ' : '') + lead.name : names.join(' و'), lead: o.lead || '', look: o.look || '', badge: o.badge || '', names: names.length > 1 ? names : [], source: f.source || '' };
+    if (f.repeat === 'once') { x.repeat = 'once'; x.date = f.date; } else if (f.coptic) x.coptic = f.coptic; else x.gregorian = f.gregorian;
+    if (f.year != null) x.year = f.year;
+    x.pictures = (o.pictures || []).map(function (p) { var a = albumOf(p.media); return { img: '/' + p.media, ai: !!a && (a.type === 'ai' || a.type === 'art'), crop: a && a.crop, caption: p.caption || (a && a.caption) || '' }; });
+    x.hides = (o.from ? [[o.from.person, o.from.feast, (lead || {}).name || '']] : []).concat((o.covers || []).map(function (cv) { return [cv.person, cv.feast, (personOf(cv.person) || {}).name || '']; }));
+    return x;
+  }
+  function occPreview(o, at) {
+    var entry = occEntry(o);
+    if (!entry || !at) { A.toast('مفيش يوم للمناسبة دي لسه', 'error'); return; }
+    var patrons = {};
+    occasions().forEach(function (it) {
+      var d = it.data;
+      if ((d.type === 'patron' || d.type === 'family') && d.from && !patrons[d.type]) {
+        var p = personOf(d.from.person); if (!p) return;
+        var a = mainOf(p);
+        patrons[d.type] = { id: p.id, name: p.name, days: p.feasts.map(function (fd) { return Object.assign({ kind: fd.kind }, fd.coptic ? { coptic: fd.coptic } : { gregorian: fd.gregorian }); }), img: a && a.media ? '/' + a.media : '', ai: !!a && (a.type === 'ai' || a.type === 'art'), crop: a && a.crop, praise: p.praise || null };
+      }
+    });
+    var frame = el('iframe', { class: 'oca-frame', title: 'الكارت على الموبايل', src: '../daily-bread/?preview=occ&d=' + at });
+    frame.addEventListener('load', function () { frame.contentWindow.postMessage({ type: 'bread:occ-preview', day: at, file: { types: Object.fromEntries(OCC_TYPES), occasions: [entry], patrons: patrons } }, location.origin); });
+    A.modal({ tone: 'info', icon: 'eye', title: 'هيبان كده يوم ' + gText(at, true), body: el('div', { class: 'oca-phone' }, frame), actions: [{ label: 'تمام', value: true, kind: 'primary' }],
+      setup: function (dialog) { dialog.classList.add('modal--form', 'sa-modal', 'oca-modal--card'); } });
+  }
+
+  /* the occasion's form (P5): the title, the type, its day (a person's day / Coptic / Gregorian / once), what it stands
+     for, the words, the pictures (the albums or the library, in order), the source. look / badge / honor / notify kept. */
   function occModal(it) {
-    var o = it ? it.data : { id: 'o' + Date.now().toString(36), name: '', kind: '', coptic: '1-1', source: '' };
-    var name = input(o.name, { placeholder: 'زي «إيبارشية البحر الأحمر»', maxlength: '120', 'data-field': 'name' });
-    var kind = input(o.kind, { placeholder: 'ذكرى إيه بالظبط', maxlength: '200' });
-    var repeat = o.repeat === 'once' ? 'once' : 'yearly';
-    var dates = dateFields(o.date ? { gregorian: o.date.slice(5), year: +o.date.slice(0, 4) } : o, { yearLabel: 'السنة', yearHint: 'لازم في «مرة واحدة»', copticLabel: 'قبطي', gregLabel: 'ميلادي' });
-    var src = ltr(o.source, { placeholder: 'https://…', 'data-field': 'source' });
-    var note = area_(o.note, 3);
-    var body = el('div', { class: 'ba-dayform sa-dayform' }, field('الاسم', name), field('المناسبة', kind),
-      field('بتتكرر؟', seg('التكرار', [['yearly', 'كل سنة'], ['once', 'مرة واحدة']], repeat, function (v) { repeat = v; }), 'مرة واحدة: بتظهر في سنتها بس (زي احتفال أو زيارة)، بتاريخها الميلادي'),
-      dates.node, field('المصدر', src, 'لازم رابط https'), field('ملحوظة', note, 'للإدارة بس'),
+    var o = it ? JSON.parse(JSON.stringify(it.data)) : { id: 'o' + Date.now().toString(36), name: '', type: 'fathers', headline: 'النهارده ', lead: '', from: null };
+    var mode = o.from ? 'from' : o.repeat === 'once' ? 'once' : o.coptic || o.gregorian ? 'yearly' : 'from';
+    var type = o.type || 'church';
+    var headline = input(o.headline || '', { maxlength: '160', placeholder: 'النهارده عيد…', 'data-field': 'headline' });
+    var lead = area_(o.lead || '', 3); lead.maxLength = 700;
+    var withDays = people().map(function (i) { return i.data; }).filter(function (p) { return p.feasts && p.feasts.length; });
+    var fromPerson = (o.from && o.from.person) || (withDays.filter(function (p) { return p.class === 'living'; })[0] || withDays[0] || {}).id;
+    var fromFeast = o.from && o.from.feast;
+    var personSel = el('select', { class: 'input' }, withDays.map(function (p) { return el('option', { value: p.id, text: p.name, selected: p.id === fromPerson }); }));
+    var feastSel = el('select', { class: 'input' });
+    function fillFeasts() {
+      var p = personOf(personSel.value); feastSel.replaceChildren();
+      (p ? p.feasts : []).forEach(function (fd) { feastSel.append(el('option', { value: fd.kind, text: fd.kind + ' · ' + dayLabel(fd), selected: fd.kind === fromFeast })); });
+    }
+    fillFeasts();
+    personSel.addEventListener('change', function () { fromFeast = null; fillFeasts(); drawPics(); });
+    var dates = dateFields(o.date ? { gregorian: o.date.slice(5), year: +o.date.slice(0, 4) } : o.coptic || o.gregorian ? o : { coptic: '1-1' }, { yearLabel: 'سنة الحدث', yearHint: 'لازم في «مرة واحدة»', copticLabel: 'قبطي', gregLabel: 'ميلادي' });
+    var src = ltr(o.source || '', { placeholder: 'https://…', 'data-field': 'source' });
+    var more = ltr((o.more || []).join(' '), { placeholder: 'اختياري' });
+    var fromBox = el('div', {}, el('div', { class: 'sa-three oca-two' }, field('الشخص', personSel), field('اليوم', feastSel)),
+      el('p', { class: 'sa-live' }, icon('link'), el('span', { text: 'التاريخ والمصدر من السجل. لو اليوم اتعدّل في صفحة الشخص، المناسبة بتمشي معاه. واليوم ده مبيظهرش في «نحب نفكّرك».' })));
+    var ownBox = el('div', {}, dates.node, field('المصدر', src, 'لازم رابط https'), field('مصادر زيادة', more));
+    function showMode() { fromBox.hidden = mode !== 'from'; ownBox.hidden = mode === 'from'; }
+    var covers = (o.covers || []).slice();
+    var coverBox = el('div', { class: 'oca-chips' });
+    function drawCovers() {
+      coverBox.replaceChildren();
+      covers.forEach(function (cv, i) { coverBox.append(el('span', { class: 'oca-chip oca-chip--cover' }, icon('check'), el('span', { text: '«' + cv.feast + '» · ' + ((personOf(cv.person) || {}).name || cv.person) }), el('button', { class: 'oca-x', type: 'button', 'aria-label': 'شيل', onclick: function () { covers.splice(i, 1); drawCovers(); drawPics(); } }, icon('close')))); });
+      coverBox.append(K.btn('ضيف يوم شخص', 'plus', 'btn--sm btn--ghost', { onclick: function () {
+        var p = personOf(personSel.value), k = feastSel.value;
+        if (mode === 'from' || !p || !k) { A.toast('اختار الشخص ويومه من «من يوم شخص في السجل» الأول، وبعدها رجّع التاريخ', 'error'); return; }
+        covers.push({ person: p.id, feast: k }); drawCovers(); drawPics();
+      } }));
+    }
+    var chosen = (o.pictures || []).slice();
+    var picBox = el('div', { class: 'oca-pick' });
+    function involved() {
+      var ids = (o.people || []).slice();
+      if (mode === 'from' && personSel.value) ids.push(personSel.value);
+      covers.forEach(function (cv) { ids.push(cv.person); });
+      chosen.forEach(function (c) { if (c.person) ids.push(c.person); });
+      return ids.filter(function (v, i, a) { return a.indexOf(v) === i; });
+    }
+    function drawPics() {
+      picBox.replaceChildren();
+      var seen = {};
+      involved().forEach(function (id) {
+        var p = personOf(id); if (!p) return;
+        (p.album || []).filter(function (a) { return a.media; }).forEach(function (a) {
+          seen[a.media] = 1;
+          var n = chosen.map(function (c) { return c.media; }).indexOf(a.media);
+          picBox.append(el('button', { class: 'oca-pickpic' + (n >= 0 ? ' is-on' : ''), type: 'button', 'aria-pressed': String(n >= 0), onclick: function () {
+            if (n >= 0) chosen.splice(n, 1); else chosen.push({ person: p.id, media: a.media });
+            drawPics();
+          } }, occThumb(a.media), n >= 0 ? el('span', { class: 'oca-pickpic__n', text: ar(n + 1) }) : null, a.type !== 'photo' ? el('span', { class: 'oca-pickpic__ai', text: 'تعبيرية' }) : null, el('small', { text: a.caption || a.stage || p.name })));
+        });
+      });
+      chosen.filter(function (c) { return !seen[c.media]; }).forEach(function (c) {
+        var n = chosen.indexOf(c);
+        picBox.append(el('button', { class: 'oca-pickpic is-on', type: 'button', 'aria-pressed': 'true', onclick: function () { chosen.splice(n, 1); drawPics(); } }, occThumb(c.media), el('span', { class: 'oca-pickpic__n', text: ar(n + 1) }), el('small', { text: 'من مكتبة الصور' })));
+      });
+      picBox.append(el('button', { class: 'oca-pickpic oca-pickpic--add', type: 'button', onclick: function () {
+        if (!A.pickFromLibrary) { A.toast('مكتبة الصور مش متاحة هنا', 'error'); return; }
+        A.pickFromLibrary(null).then(function (id) {
+          if (!id) return;
+          var m = ((A.state && A.state.draft && A.state.draft.media) || []).filter(function (x) { return x.id === id; })[0];
+          if (!m || !/^media\/\d{4}\/[a-z]{3}-[a-z0-9]{8}\.(webp|jpg)$/.test(m.path || '')) { A.toast('الصورة دي مش من مكتبة الصور', 'error'); return; }
+          chosen.push({ media: m.path }); drawPics();
+        });
+      } }, icon('photos'), el('small', { text: 'من مكتبة الصور' })));
+    }
+    drawCovers(); drawPics(); showMode();
+    var body = el('div', { class: 'ba-dayform sa-dayform oca-form' },
+      field('العنوان اللي بيظهر', headline, 'بيبدأ بـ«النهارده…». الكارت بيكتب تحته اسم الشخص لوحده'),
+      field('النوع', seg('النوع', OCC_TYPES, type, function (v) { type = v; })),
+      field('اليوم', seg('اليوم', [['from', 'من يوم شخص في السجل'], ['yearly', 'كل سنة (قبطي أو ميلادي)'], ['once', 'مرة واحدة']], mode, function (v) { mode = v; showMode(); drawPics(); })),
+      fromBox, ownBox,
+      field('بتغطّي كمان', coverBox, 'أيام أشخاص في نفس اليوم بيقولوا نفس الخبر: بتتجمع هنا، ومبتظهرش لوحدها ولا في «نحب نفكّرك».'),
+      field('الكلام', lead, 'معايدة وصلاة على حسب الشخص، والوقائع بمصدرها بس. لحد ٧٠٠ حرف'),
+      type === 'patron' || type === 'family' ? K.note('info', 'كلمة السنكسار بتيجي لوحدها من «الأعياد» (نفس كلمة الأنبا تكلا)، والتمجيد كامل من صفحة الشخص.') : null,
+      field('الصور', picBox, 'من ألبومات الأشخاص أو من مكتبة الصور. الرقم = الترتيب: الأولى قدام، والباقي ورا بعض، ودوسة بتفتحهم كلهم. صورة واحدة لكل أب لو اتنين.'),
       it ? el('div', {}, K.btn('شيل المناسبة', 'trash', 'btn--sm btn--ghost sa-danger', { onclick: function (e) {
         e.target.closest('dialog').querySelector('.modal__actions .btn').click();
         api('POST', 'item/delete', { kind: 'occasion', id: it.id, rev: it.rev }).then(function () { A.toast('اتشالت من المسودة'); return load(true); }).catch(fail);
       } })) : null);
-    form(it ? 'مناسبة · ' + o.name : 'مناسبة جديدة', it ? 'edit' : 'plus', body, 'احفظ').then(function (ok) {
+    form(it ? 'مناسبة · ' + occName(o) : 'مناسبة جديدة', it ? 'edit' : 'plus', body, 'احفظ').then(function (ok) {
       if (!ok) return;
-      var d = dates.read();
-      var v = { id: o.id, name: name.value.trim(), source: src.value.trim() };
-      if (kind.value.trim()) v.kind = kind.value.trim();
-      if (repeat === 'once') {
-        if (!d.year || !d.gregorian) { A.toast('المرة الواحدة: اختار «ميلادي» واكتب السنة', 'error'); return; }
-        v.repeat = 'once'; v.date = d.year + '-' + d.gregorian;
-      } else Object.assign(v, d);
-      if (note.value.trim()) v.note = note.value.trim();
-      if (!v.name || !URL_RE.test(v.source)) { A.toast('الاسم والمصدر (https) لازم', 'error'); return; }
+      var v = { id: o.id, name: occName({ headline: headline.value.trim() }) || o.name, type: type, headline: headline.value.trim(), lead: lead.value.trim() };
+      ['look', 'badge', 'honor', 'people', 'notify', 'kind', 'note'].forEach(function (k) { if (o[k] != null && o[k] !== '') v[k] = o[k]; });
+      if (mode === 'from') v.from = { person: personSel.value, feast: feastSel.value };
+      else {
+        var d = dates.read();
+        if (mode === 'once') { if (!d.year || !d.gregorian) { A.toast('المرة الواحدة: اختار «ميلادي» واكتب السنة', 'error'); return; } v.repeat = 'once'; v.date = d.year + '-' + d.gregorian; }
+        else { if (d.coptic) v.coptic = d.coptic; else v.gregorian = d.gregorian; if (d.year) v.year = d.year; }
+        v.source = src.value.trim();
+        var mo = more.value.trim().split(/\s+/).filter(Boolean); if (mo.length) v.more = mo;
+        if (!URL_RE.test(v.source)) { A.toast('المصدر لازم رابط https', 'error'); return; }
+      }
+      if (covers.length) v.covers = covers;
+      if (chosen.length) v.pictures = chosen;
+      if (!v.headline) { A.toast('اكتب العنوان', 'error'); return; }
       api('POST', 'item', { kind: 'occasion', rev: it ? it.rev : 0, item: v }).then(function () { A.toast('اتحفظت ✓ (لسه مش منشورة)'); return load(true); }).catch(function (error) {
         if (error && error.code === 'invalid' && error.reply && error.reply.errors) A.toast(error.reply.errors[0], 'error'); else fail(error);
       });
