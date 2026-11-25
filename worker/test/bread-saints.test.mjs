@@ -36,7 +36,7 @@ test('migration + seed: the 108 people and the diocese from P2, status computed,
   const { h } = await world({ on: false });
   const n = k => h.db.prepare('SELECT COUNT(*) AS n FROM saints_items WHERE kind = ?').bind(k).first('n');
   assert.equal(await n('person'), 108);
-  assert.equal(await n('occasion'), 16, 'P2's diocese + the 15 of P5 (0037)');
+  assert.equal(await n('occasion'), 16, 'the P2 diocese + the 15 of P5 (0037)');
   assert.equal(await h.db.prepare("SELECT value FROM settings WHERE key = 'BREAD_SAINTS'").first('value'), '0');
   const mar = JSON.parse(await h.db.prepare("SELECT data FROM saints_items WHERE kind = 'person' AND id = 'isaacsyrian'").first('data'));
   assert.deepEqual([mar.status, mar.missing], ['incomplete', ['feasts']]);
