@@ -133,12 +133,15 @@ function event(type, { at = null } = {}) {
   const ev = c.querySelector('.id-ev'), words = [...ev.querySelectorAll('[data-t]')], last = o.end - o.from;
   const finish = () => { ev.classList.add('is-out'); c.classList.remove('is-event'); c.classList.add('is-in', 'is-done'); setTimeout(() => ev.remove(), 1200); };
   const nameAt = +ev.querySelector('.id-ev__l--name [data-t]').dataset.t, face = ev.querySelector('.id-ev__face');
-  const paint = now => { words.forEach(w => w.classList.toggle('on', now >= +w.dataset.t)); face.classList.toggle('on', now >= nameAt); return now >= last; };
+  const paint = now => { words.forEach(w => w.classList.toggle('on', now >= +w.dataset.t)); face.classList.toggle('on', now >= nameAt); return now >= last - 0.2; };
   if (at != null) { paint(at); if (at >= last) finish(); return; }
   const audio = new Audio(pickSrc(o.src)); audio.volume = 0.8;
   const t0 = performance.now(); let playing = false;
+  // the card comes when the clip ends (its last frame may sit a hair before `last`), or by the clock if no sound
+  let done = false; const end = () => { if (!done) { done = true; finish(); } };
+  audio.addEventListener('ended', end);
   audio.play().then(() => { playing = true; }, () => {});
-  const tick = () => { const now = playing ? audio.currentTime : (performance.now() - t0) / 1000; if (paint(now)) finish(); else requestAnimationFrame(tick); };
+  const tick = () => { if (done) return; const now = playing ? audio.currentTime : (performance.now() - t0) / 1000; if (paint(now)) end(); else requestAnimationFrame(tick); };
   requestAnimationFrame(tick);
 }
 
