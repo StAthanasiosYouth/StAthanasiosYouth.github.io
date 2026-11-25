@@ -22,38 +22,65 @@ const own = svg => { const p = 'l' + (++nth) + '-'; return { p, svg: svg.replace
 const LB = fix(B, ROOT), LC = fix(C, ROOT);
 const LOGO_B = () => own(LB).svg, LOGO_C = () => own(LC).svg;
 
-/* ---------- sounds: made in the browser, no files ---------- */
-let ctx = null;
-const ac = () => (ctx ||= new (window.AudioContext || window.webkitAudioContext)());
-function bell(at = 0, base = 392, gain = 0.22, len = 3.2) {
+/* ---------- sounds (owner 2026-11-25: simple, calm, elegant, spiritual; nothing loud or showy) ----------
+ * Made in the browser (Web Audio), no files: a soft far church bell, a low warm drone, a gentle two-note chime, and a
+ * slow phrase in the church's mode, played softly like a cantor's opening. Quiet master volume, a soft room echo,
+ * slow attacks. The real hymn openings (Abu Sefein's doxology, Pope Athanasius) wait for the owner's OK to download
+ * and the right to use them; until then these stand in.
+ */
+let ctx = null, room = null, out = null;
+function ac() {
+  if (ctx) return ctx;
+  ctx = new (window.AudioContext || window.webkitAudioContext)();
+  out = ctx.createGain(); out.gain.value = 0.55; out.connect(ctx.destination);
+  // a soft room: two short feedback echoes, low-passed
+  room = ctx.createGain(); room.gain.value = 0.28;
+  const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2400;
+  [0.11, 0.23].forEach(t => { const d = ctx.createDelay(1); d.delayTime.value = t; const fb = ctx.createGain(); fb.gain.value = 0.38; d.connect(fb).connect(d); room.connect(d); d.connect(lp); });
+  lp.connect(out);
+  return ctx;
+}
+const send = node => { node.connect(out); node.connect(room); };
+/* a far church bell: few partials, soft strike, long gentle decay */
+function bell(at = 0, base = 220, gain = 0.09, len = 4.5) {
   const a = ac(), t = a.currentTime + at;
-  [[1, 1], [2.0, .55], [2.4, .4], [3.0, .25], [4.2, .16], [5.4, .1]].forEach(([m, g]) => {
+  [[1, 1], [2.0, .4], [2.76, .22], [5.4, .06]].forEach(([m, g]) => {
     const o = a.createOscillator(), v = a.createGain();
-    o.frequency.value = base * m; o.type = 'sine';
-    v.gain.setValueAtTime(0, t); v.gain.linearRampToValueAtTime(gain * g, t + 0.006); v.gain.exponentialRampToValueAtTime(0.0001, t + len / (0.6 + m * 0.25));
-    o.connect(v).connect(a.destination); o.start(t); o.stop(t + len);
+    o.type = 'sine'; o.frequency.value = base * m;
+    v.gain.setValueAtTime(0, t); v.gain.linearRampToValueAtTime(gain * g, t + 0.02); v.gain.exponentialRampToValueAtTime(0.0001, t + len / (0.8 + m * 0.3));
+    o.connect(v); send(v); o.start(t); o.stop(t + len);
   });
 }
-function shing(at = 0) {
-  const a = ac(), t = a.currentTime + at, n = a.sampleRate * 0.6, buf = a.createBuffer(1, n, a.sampleRate), d = buf.getChannelData(0);
-  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3);
-  const s = a.createBufferSource(), f = a.createBiquadFilter(), v = a.createGain();
-  s.buffer = buf; f.type = 'bandpass'; f.frequency.setValueAtTime(3200, t); f.frequency.exponentialRampToValueAtTime(7200, t + 0.35); f.Q.value = 6;
-  v.gain.setValueAtTime(0.0001, t); v.gain.exponentialRampToValueAtTime(0.35, t + 0.02); v.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
-  s.connect(f).connect(v).connect(a.destination); s.start(t);
-  [2637, 3951].forEach((fr, i) => { const o = a.createOscillator(), g = a.createGain(); o.frequency.value = fr; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.05 - i * 0.02, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9); o.connect(g).connect(a.destination); o.start(t); o.stop(t + 1); });
+/* a slow, soft phrase in the church's mode, like a cantor's first words (sine + a little warmth) */
+function phrase(at, notes, { step = 0.42, gain = 0.07 } = {}) {
+  const a = ac(); let t = a.currentTime + at;
+  for (const [f, d = 1] of notes) {
+    const o = a.createOscillator(), o2 = a.createOscillator(), v = a.createGain(), dur = step * d;
+    o.type = 'sine'; o2.type = 'triangle'; o.frequency.value = f; o2.frequency.value = f; o2.detune.value = 4;
+    const g2 = a.createGain(); g2.gain.value = 0.25;
+    v.gain.setValueAtTime(0, t); v.gain.linearRampToValueAtTime(gain, t + 0.12); v.gain.setValueAtTime(gain, t + dur * 0.7); v.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.5);
+    o.connect(v); o2.connect(g2).connect(v); send(v); o.start(t); o2.start(t); o.stop(t + dur + 0.6); o2.stop(t + dur + 0.6);
+    t += dur;
+  }
 }
-function hum(at = 0) { // a repose: one low, warm tone, very soft
-  const a = ac(), t = a.currentTime + at, o = a.createOscillator(), v = a.createGain();
-  o.frequency.value = 196; o.type = 'sine'; v.gain.setValueAtTime(0, t); v.gain.linearRampToValueAtTime(0.06, t + 0.6); v.gain.exponentialRampToValueAtTime(0.0001, t + 3);
-  o.connect(v).connect(a.destination); o.start(t); o.stop(t + 3.1);
+/* a low warm drone, for a repose */
+function drone(at = 0, f = 146.8, len = 3.6, gain = 0.045) {
+  const a = ac(), t = a.currentTime + at;
+  [f, f * 1.5].forEach((fr, i) => { const o = a.createOscillator(), v = a.createGain(); o.type = 'sine'; o.frequency.value = fr; v.gain.setValueAtTime(0, t); v.gain.linearRampToValueAtTime(gain * (i ? .4 : 1), t + 1.1); v.gain.exponentialRampToValueAtTime(0.0001, t + len); o.connect(v); send(v); o.start(t); o.stop(t + len + 0.1); });
 }
-const chime = (at = 0) => { bell(at, 784, 0.09, 2); bell(at + 0.18, 1047, 0.07, 2); };
-const SOUND = { patron: () => { shing(0.62); bell(1.05); }, repose: () => hum(0.1), pope: () => chime(0.3), family: () => { bell(0.4, 523, 0.14, 2.6); } };
+const chime = (at = 0) => { bell(at, 659, 0.035, 2.4); bell(at + 0.5, 880, 0.028, 2.4); };
+// D (ré) mode, as many Coptic hymns: D E F G A
+const N = { D: 293.7, E: 329.6, F: 349.2, G: 392, A: 440 };
+const SOUND = {
+  patron: () => { bell(0.1, 196, 0.08); phrase(0.7, [[N.D], [N.F], [N.G, 1.5], [N.F], [N.E], [N.D, 2]]); },  // one far bell, then a short soft phrase
+  repose: () => drone(0.1),                                                                      // a low drone only, no bell
+  pope: () => { chime(0.2); phrase(1.0, [[N.A], [N.G], [N.A, 2]], { gain: 0.05, step: 0.5 }); },     // a soft chime, three slow notes
+  family: () => { bell(0.2, 262, 0.07, 3.6); phrase(0.9, [[N.G], [N.A], [N.G, 2]], { gain: 0.05 }); }
+};
 
 /* ---------- the page ---------- */
 app.innerHTML = `
-  <header class="id-h"><p class="id-k">P5 · المعاينة</p><h1>هوية «مناسبات كنيستنا»</h1><p>شعار جنب «خبزنا اليومي»، ودخلة للقسم، وطريقة ظهور لكل نوع مناسبة. الأصوات بتشتغل بعد دوسة بس.</p></header>
+  <header class="id-h"><p class="id-k">P5 · المعاينة</p><h1>هوية «مناسبات كنيستنا»</h1><p>شعار جنب «خبزنا اليومي»، ودخلة للقسم، وطريقة ظهور لكل نوع مناسبة. الأصوات هادية وروحانية، وبتشتغل بعد دوسة بس.</p></header>
 
   <section class="id-sec" id="pair"><h2>١. الشعارين جنب بعض</h2>
     <div class="id-pair"><figure>${LOGO_B()}<figcaption>خبزنا اليومي · الفجر والكلمة</figcaption></figure><span class="id-pair__line" aria-hidden="true"></span><figure>${LOGO_C()}<figcaption>مناسبات كنيستنا · سيفين أبي سيفين وإكليله فوق كنيستنا</figcaption></figure></div>
@@ -67,10 +94,10 @@ app.innerHTML = `
 
   <section class="id-sec" id="types"><h2>٣. ظهور كل مناسبة حسب طبيعتها</h2>
     <div class="id-types">
-      ${card('patron', 'عيد استشهاد شفيع كنيستنا', 'الشهيد العظيم أبي سيفين', '/media/2026/img-f6438158.webp', 'السيفين بيلمعوا، ونور دهبي بيعدّي، وجرس الكنيسة')}
-      ${card('repose', 'ذكرى نياحة أسقفنا الراحل', 'الأنبا ثاؤفيلس أول أسقف للبحر الأحمر', '/media/2026/img-cf1afea8.webp', 'نور شمعة هادي، والظهور بطيء، ومن غير جرس')}
-      ${card('pope', 'عيد جلوس قداسة البابا', 'البابا تواضروس الثاني', '/media/2026/img-bc3f23c3.webp', 'نور نازل من فوق، ونغمة خفيفة')}
-      ${card('family', 'عيد شفيع أسرتنا', 'البابا أثناسيوس الرسولي', '/media/2026/img-d6052d80.webp', 'ختم الأسرة بيلف ويستقر، وجرس صغير')}
+      ${card('patron', 'عيد استشهاد شفيع كنيستنا', 'الشهيد العظيم أبي سيفين', '/media/2026/img-f6438158.webp', 'السيفين بيلمعوا ونور دهبي بيعدّي، وجرس بعيد هادي وبعده جملة لحن قصيرة')}
+      ${card('repose', 'ذكرى نياحة أسقفنا الراحل', 'الأنبا ثاؤفيلس أول أسقف للبحر الأحمر', '/media/2026/img-cf1afea8.webp', 'نور شمعة هادي، والظهور بطيء، ونغمة واطية بس من غير جرس')}
+      ${card('pope', 'عيد جلوس قداسة البابا', 'البابا تواضروس الثاني', '/media/2026/img-bc3f23c3.webp', 'نور نازل من فوق، ورنتين رقاق وتلات نغمات بطيئة')}
+      ${card('family', 'عيد شفيع أسرتنا', 'البابا أثناسيوس الرسولي', '/media/2026/img-d6052d80.webp', 'الصورة بتلف وتستقر زي الختم، وجرس صغير وجملة قصيرة')}
     </div>
   </section>`;
 function card(type, title, who, img, note) {
@@ -97,10 +124,10 @@ function intro({ hold = null, sound = false } = {}) {
   A($('halo-glow'), [{ opacity: 0, transform: 'scale(.3)' }, { opacity: .75, transform: 'none' }], { duration: 900, delay: 500 });
   A($('stars'), [{ opacity: 0 }, { opacity: 1 }], { duration: 900, delay: 500 });
   // the swords fly in from both sides and meet with a flash (≈ 0.62 s, the «shing»)
-  A($('sword-a').parentNode, [{ transform: 'translate(-420px, 160px) rotate(-60deg)', opacity: 0 }, { opacity: 1, offset: .3 }, { transform: 'translate(500px, 515px) rotate(-36deg) scale(.9) translate(-500px, -530px)', opacity: 1 }], { duration: 560, delay: 120, easing: 'cubic-bezier(.5, 0, .2, 1.25)' });
-  A($('sword-b').parentNode, [{ transform: 'translate(1420px, 160px) rotate(60deg)', opacity: 0 }, { opacity: 1, offset: .3 }, { transform: 'translate(500px, 515px) rotate(36deg) scale(.9) translate(-500px, -530px)', opacity: 1 }], { duration: 560, delay: 120, easing: 'cubic-bezier(.5, 0, .2, 1.25)' });
+  A($('sword-a').parentNode, [{ transform: 'translate(-420px, 160px) rotate(-60deg)', opacity: 0 }, { opacity: 1, offset: .3 }, { transform: 'translate(500px, 470px) rotate(-40deg) scale(.62) translate(-500px, -530px)', opacity: 1 }], { duration: 560, delay: 120, easing: 'cubic-bezier(.5, 0, .2, 1.25)' });
+  A($('sword-b').parentNode, [{ transform: 'translate(1420px, 160px) rotate(60deg)', opacity: 0 }, { opacity: 1, offset: .3 }, { transform: 'translate(500px, 470px) rotate(40deg) scale(.62) translate(-500px, -530px)', opacity: 1 }], { duration: 560, delay: 120, easing: 'cubic-bezier(.5, 0, .2, 1.25)' });
   A(st.querySelector('.id-in__flash'), [{ opacity: 0, transform: 'scale(.2)' }, { opacity: 1, transform: 'scale(1)', offset: .25 }, { opacity: 0, transform: 'scale(1.6)' }], { duration: 650, delay: 640 });
-  A($('crown'), [{ transform: 'translate(500px, 380px) scale(.62)', opacity: 0 }, { transform: 'translate(500px, 486px) scale(.62)', opacity: 1 }], { duration: 600, delay: 900, easing: 'cubic-bezier(.34, 1.56, .64, 1)' });
+  A($('crown'), [{ transform: 'translate(500px, 370px) scale(.72)', opacity: 0 }, { transform: 'translate(500px, 458px) scale(.72)', opacity: 1 }], { duration: 600, delay: 900, easing: 'cubic-bezier(.34, 1.56, .64, 1)' });
   A($('hills'), [{ transform: 'translateY(120px)' }, { transform: 'none' }], { duration: 700, delay: 700 });
   A($('church'), [{ transform: 'translateY(200px)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 800, delay: 820 });
   A($('windows'), [{ opacity: 0 }, { opacity: 1 }], { duration: 500, delay: 1350 });
@@ -111,7 +138,7 @@ function intro({ hold = null, sound = false } = {}) {
   A(st.querySelector('.id-in__logo'), [{ transform: 'none' }, { transform: 'none', offset: .8 }, { transform: 'translate(0, -34%) scale(.26)', opacity: 1 }], { duration: 2600 });
   A(st.querySelector('.id-in'), [{ opacity: 1 }, { opacity: 1, offset: .82 }, { opacity: 0 }], { duration: 2600 });
   if (hold != null) anims.forEach(a => { a.pause(); a.currentTime = hold; });
-  else if (sound) { shing(0.62); bell(1.0); bell(1.85, 392, 0.12); }
+  else if (sound) { drone(0, 146.8, 2.6, 0.03); bell(0.62, 196, 0.07); }   // calm: a low swell, one far bell as the swords meet
 }
 function reveal(type) {
   const c = app.querySelector(`.id-card--${type}`);
