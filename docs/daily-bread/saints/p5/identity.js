@@ -94,10 +94,10 @@ app.innerHTML = `
 
   <section class="id-sec" id="types"><h2>٣. ظهور كل مناسبة حسب طبيعتها</h2>
     <div class="id-types">
-      ${card('patron', 'عيد استشهاد شفيع كنيستنا', 'الشهيد العظيم أبي سيفين', '/media/2026/img-f6438158.webp', 'السيفين بيلمعوا ونور دهبي بيعدّي، وجرس بعيد هادي وبعده جملة لحن قصيرة')}
+      ${card('patron', 'عيد استشهاد شفيع كنيستنا', 'الشهيد العظيم أبي سيفين', '/media/2026/img-f6438158.webp', '«تعالوا نتهلل بالألحان» من المديح، وكلامه بيتكتب مع الصوت، ولما يتقال «فيلوباتير مارقوريوس» الصوت يهدى والكارت يظهر')}
       ${card('repose', 'ذكرى نياحة أسقفنا الراحل', 'الأنبا ثاؤفيلس أول أسقف للبحر الأحمر', '/media/2026/img-cf1afea8.webp', 'نور شمعة هادي، والظهور بطيء، ونغمة واطية بس من غير جرس')}
       ${card('pope', 'عيد جلوس قداسة البابا', 'البابا تواضروس الثاني', '/media/2026/img-bc3f23c3.webp', 'نور نازل من فوق، ورنتين رقاق وتلات نغمات بطيئة')}
-      ${card('family', 'عيد شفيع أسرتنا', 'البابا أثناسيوس الرسولي', '/media/2026/img-d6052d80.webp', 'الصورة بتلف وتستقر زي الختم، وجرس صغير وجملة قصيرة')}
+      ${card('family', 'عيد شفيع أسرتنا', 'البابا أثناسيوس الرسولي', '/media/2026/img-d6052d80.webp', '«أثناسيوس يا رسول» من المديح بنفس الطريقة، لحد «بنيوت أفا أثناسيوس»')}
     </div>
   </section>`;
 function card(type, title, who, img, note) {
@@ -105,6 +105,37 @@ function card(type, title, who, img, note) {
     <div class="id-card__arch">${img ? `<img src="${ROOT.slice(0, -1)}${img}" alt="">` : `<span class="id-card__ph">${type === 'repose' ? '✝' : type === 'pope' ? '☧' : '✠'}</span>`}</div>
     <div class="id-card__body"><p class="id-card__k">${{ patron: 'شفيع كنيستنا', repose: 'تذكار', pope: 'قداسة البابا', family: 'شفيع أسرتنا' }[type]}</p><h3>${title}</h3><p>${who}</p><small>${note}</small></div>
     <button class="id-btn id-btn--sm" type="button" data-play="${type}">▶ شوف الظهور</button></article>`;
+}
+
+/* ---------- an event (owner 2026-11-25): the opening of the hymn sung in church, its words written with the voice ----------
+ * Abu Sefein: «تعالوا نتهلل بالألحان» … until «فيلوباتير مارقوريوس» (CTV, «مديح القديس فيلوباتير مرقوريوس أبو سيفين»).
+ * Pope Athanasius: «أثناسيوس يا رسول» … until «بنيوت أفا أثناسيوس» (ME Sat, «مديح لتمجيد البابا أثناسيوس الرسولي»).
+ * The clip ends softly right after the name (a ≈ 1.5 s fade). The word times are the recording's own (faster-whisper,
+ * checked against the hymn's text). No sound allowed → the words still come, by the clock.
+ */
+const OPEN = {
+  patron: { src: 'sound/mercurius-open', from: 3.65, credit: 'من مديح أبي سيفين · قناة CTV', end: 21.43, lines: [
+    [['تعالوا', 4.05], ['نتهلل', 5.03], ['بالألحان', 6.53]], [['ونرتل', 8.11], ['للفادي', 9.93], ['الديان', 11.15]],
+    [['في', 12.47], ['عيد', 12.87], ['الشهيد', 13.31], ['بطل', 14.87], ['الإيمان', 15.43]], [['فيلوباتير', 16.81], ['مارقوريوس', 19.15]]] },
+  family: { src: 'sound/athanasius-open', from: 8.05, credit: 'من مديح البابا أثناسيوس · قناة ME Sat', end: 22.02, lines: [
+    [['أثناسيوس', 8.46], ['يا', 10.88], ['رسول', 11.18]], [['حبنا', 12.48], ['لك', 13.78], ['على', 14.62], ['طول', 14.96]],
+    [['كلنا', 15.58], ['بأجمعنا', 16.42], ['نقول', 18.0]], [['بنيوت', 18.88], ['أفا', 19.78], ['أثناسيوس', 20.42]]] }
+};
+const pickSrc = base => (document.createElement('audio').canPlayType('audio/ogg; codecs=opus') ? base + '.opus' : base + '.m4a');
+function event(type, { at = null } = {}) {
+  const o = OPEN[type], c = app.querySelector('.id-card--' + type);
+  c.classList.remove('is-in', 'is-done'); c.classList.add('is-event');
+  c.querySelector('.id-ev')?.remove();
+  c.insertAdjacentHTML('afterbegin', `<div class="id-ev" aria-hidden="true">${o.lines.map((l, i) => `<p class="id-ev__l${i === o.lines.length - 1 ? ' id-ev__l--name' : ''}">${l.map(([w, t]) => `<span data-t="${(t - o.from).toFixed(2)}">${w}</span>`).join(' ')}</p>`).join('')}<small class="id-ev__credit">${o.credit}</small></div>`);
+  const ev = c.querySelector('.id-ev'), words = [...ev.querySelectorAll('[data-t]')], last = o.end - o.from;
+  const finish = () => { ev.classList.add('is-out'); c.classList.remove('is-event'); c.classList.add('is-in', 'is-done'); setTimeout(() => ev.remove(), 1200); };
+  const paint = now => { words.forEach(w => w.classList.toggle('on', now >= +w.dataset.t)); return now >= last + 0.35; };
+  if (at != null) { paint(at); if (at >= last + 0.35) finish(); return; }
+  const audio = new Audio(pickSrc(o.src)); audio.volume = 0.8;
+  const t0 = performance.now(); let playing = false;
+  audio.play().then(() => { playing = true; }, () => {});
+  const tick = () => { const now = playing ? audio.currentTime : (performance.now() - t0) / 1000; if (paint(now)) finish(); else requestAnimationFrame(tick); };
+  requestAnimationFrame(tick);
 }
 
 /* ---------- the entrance ---------- */
@@ -147,10 +178,11 @@ function reveal(type) {
 }
 app.addEventListener('click', e => {
   const b = e.target.closest('[data-play]'); if (!b) return;
-  if (b.dataset.play === 'intro') intro({ sound: true }); else reveal(b.dataset.play);
+  if (b.dataset.play === 'intro') intro({ sound: true }); else if (OPEN[b.dataset.play]) event(b.dataset.play); else reveal(b.dataset.play);
 });
 if (q.get('t') != null) intro({ hold: +q.get('t') });
 else intro({ hold: 2050 });
 if (q.get('show')) document.querySelectorAll('.id-sec').forEach(s => { s.hidden = s.id !== q.get('show') && !(q.get('show') === 'types' && s.id === 'types'); });
+if (q.get('event')) event(q.get('event'), { at: q.get('at') != null ? +q.get('at') : null });
 if (q.get('reveal')) { app.querySelectorAll('.id-card').forEach(c => c.classList.add('is-in', 'is-held')); }
 document.documentElement.dataset.ready = '1';
