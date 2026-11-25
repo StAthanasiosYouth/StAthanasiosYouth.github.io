@@ -75,7 +75,7 @@ test('first publish: saints.json without the internal parts, a snapshot, a mirro
   assert.equal(file.people.length, 108);
   const raw = row.body;
   for (const internal of ['"pending"', '"src"', '"note"', 'picturesRoot', '"sources"']) assert.ok(!raw.includes(internal), internal + ' stays internal');
-  assert.equal((await w.h.db.prepare("SELECT COUNT(*) AS n FROM publish_jobs WHERE mode = 'bread'").first('n')), 2, 'saints.json + occasions.json (P5)');
+  assert.equal((await w.h.db.prepare("SELECT COUNT(*) AS n FROM publish_jobs WHERE mode = 'bread'").first('n')), 3, 'saints.json + occasions.json (P5) + praises.json (P5b)');
   assert.equal((await w.h.db.prepare('SELECT COUNT(*) AS n FROM saints_snapshots').first('n')), 1);
   assert.ok((await w.admin('GET', 'bread/saints')).body.items.every(i => i.state === 'published'));
   // the «الأعياد» tab: February 2027 has Anba Theophilus's repose (12 Feb); no living father anywhere

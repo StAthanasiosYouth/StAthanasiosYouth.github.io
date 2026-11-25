@@ -934,10 +934,10 @@
     var pub = published && published.published ? published.feasts : null;
     var list = (suggested || []).filter(keep).map(function (f) {
       var on = pub ? pub.some(function (p) { return p.date === f.date && p.name === f.name; }) : f.on !== false;
-      return { date: f.date, name: f.name, title: f.title || '', word: f.word, sourceUrl: f.sourceUrl || f.url, img: f.img || null, imgAi: !!(f.img && f.imgAi), praise: f.praise || null, praiseTitle: f.praiseTitle || null, praiseText: f.praiseText || null, others: f.others || [], on: on };
+      return { date: f.date, name: f.name, title: f.title || '', word: f.word, sourceUrl: f.sourceUrl || f.url, img: f.img || null, imgAi: !!(f.img && f.imgAi), praise: f.praise || null, praiseTitle: f.praiseTitle || null, praiseText: f.praiseText || null, praiseId: f.praiseId || null, id: f.id || f.person || undefined, kind: f.kind || undefined, others: f.others || [], on: on };
     });
     (pub || []).forEach(function (p) {
-      if (!list.some(function (f) { return f.date === p.date && f.name === p.name; })) list.push({ date: p.date, name: p.name, title: p.title || '', word: p.word, sourceUrl: p.url, img: p.img || null, imgAi: !!(p.img && p.imgAi), praise: p.praise || null, praiseTitle: p.praiseTitle || null, praiseText: p.praiseText || null, others: [], on: true });
+      if (!list.some(function (f) { return f.date === p.date && f.name === p.name; })) list.push({ date: p.date, name: p.name, title: p.title || '', word: p.word, sourceUrl: p.url, img: p.img || null, imgAi: !!(p.img && p.imgAi), praise: p.praise || null, praiseTitle: p.praiseTitle || null, praiseText: p.praiseText || null, praiseId: p.praiseId || null, id: p.person || undefined, kind: p.kind || undefined, others: [], on: true });
     });
     list.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
     var state = { list: list, published: null, loading: false, error: null };
@@ -961,7 +961,10 @@
         var same = list.filter(function (x) { return x.date === f.date; })[0];
         if (!same) { list.push(f); return; }
         // P4: the same person that day → the album's picture (and its «صورة تعبيرية») over the suggestion's older copy
-        if (f.img && (same.id ? same.id === f.id : same.name === f.name)) { same.img = f.img; same.imgAi = !!f.imgAi; }
+        var mine = same.id ? same.id === f.id : same.name === f.name;
+        if (f.img && mine) { same.img = f.img; same.imgAi = !!f.imgAi; }
+        // P5b: the same person that day → the words written for that day, and its praise in full, over the suggestion's
+        if (mine) { same.id = f.id; same.kind = f.kind; if (f.ownWord) same.word = f.word; if (f.praiseId) { same.praise = f.praise; same.praiseTitle = f.praiseTitle; same.praiseText = f.praiseText; same.praiseId = f.praiseId; } }
       });
       BR.feasts[month] = feastsFrom(month, list, both[1]);
       A.render();
@@ -987,7 +990,9 @@
           f.img ? el('img', { src: /^\/media\/\d{4}\/[a-z]{3}-[a-z0-9]{8}\.(webp|jpg)$/.test(f.img) ? f.img.replace(/\.(webp|jpg)$/, '-480.$1') : f.img, alt: '', width: '44', height: '44', loading: 'lazy', referrerpolicy: 'no-referrer' }) : null,
           el('span', {}, el('b', { text: dateWord(f.date) + ' · ' + f.name }), el('small', { text: f.title || '' }),
             // the saints registry (owner 2026-11-19): the saint's praise, and who else is remembered that day
-            el('small', { class: 'ba-feast__praise', text: f.praiseText ? '♫ ' + f.praiseText.split('\n')[0] : 'من غير تمجيد' }),
+            el('small', { class: 'ba-feast__praise', text: f.praiseText ? '♫ ' + f.praiseText.split('\n')[0] + (f.praiseId ? ' · كامل على صفحتنا' : '') : 'من غير تمجيد' }),
+            // P5b: the day's «نحب نفكّرك» words, so the owner reads them before publishing
+            f.word ? el('small', { class: 'ba-feast__word', text: f.word.split('\n')[0].slice(0, 140) + (f.word.length > 140 ? '…' : '') }) : null,
             f.others && f.others.length ? el('small', { text: 'ونفس اليوم: ' + f.others.join('، ') }) : null)),
         onPick ? btn('معاينة', 'phone', 'btn--sm btn--ghost', { 'data-act': 'bread-feast-preview', onclick: function () { onPick(f); } }) : null);
     });
@@ -1000,7 +1005,7 @@
       el('div', { class: 'ba-actions' }, toggle, el('span', { class: 'sp' }),
         same ? tag(on.length ? 'اتنشرت ✓' : 'اتنشرت فاضية: مفيش عيد ظاهر', 'ok') : st.published !== null ? tag('فيه تعديل مش منشور', 'warn') : null,
         btn(label, 'check', 'btn--primary btn--sm', { 'data-act': 'bread-feasts', disabled: same || (st.published === null && !on.length), onclick: function (event) {
-          var body = { month: month, feasts: on.map(function (f) { return { date: f.date, name: f.name, title: f.title || undefined, word: f.word, url: f.sourceUrl, img: f.img || undefined, imgAi: f.img && f.imgAi ? true : undefined, praise: f.praise || undefined, praiseTitle: f.praiseText ? f.praiseTitle || undefined : undefined, praiseText: f.praiseText || undefined, person: f.id || undefined, kind: f.id ? f.kind || undefined : undefined }; }) };
+          var body = { month: month, feasts: on.map(function (f) { return { date: f.date, name: f.name, title: f.title || undefined, word: f.word, url: f.sourceUrl, img: f.img || undefined, imgAi: f.img && f.imgAi ? true : undefined, praise: f.praise || undefined, praiseTitle: f.praiseText ? f.praiseTitle || undefined : undefined, praiseText: f.praiseText || undefined, praiseId: f.praiseText && f.id ? f.praiseId || undefined : undefined, person: f.id || undefined, kind: f.id ? f.kind || undefined : undefined }; }) };
           A.withBusy(event.currentTarget, api('POST', 'feasts', body).then(function () { st.published = key; A.toast('اتنشرت أعياد ' + monthName(month)); A.render(); })).catch(function (error) { A.fail(error); });
         } }))
     ]);
@@ -1027,7 +1032,7 @@
     var list = st && st.list ? st.list : [];
     var chosen = list.filter(function (f) { return f.date === BR.feastPick; })[0] || list[0] || null;
     BR.feastPick = chosen ? chosen.date : null;
-    BR.previewDay = chosen ? { feastOnly: true, date: chosen.date, feast: { name: chosen.name, title: chosen.title, word: chosen.word, img: chosen.img, imgAi: !!chosen.imgAi, url: chosen.sourceUrl, praise: chosen.praise, praiseTitle: chosen.praiseTitle, praiseText: chosen.praiseText } } : null;
+    BR.previewDay = chosen ? { feastOnly: true, date: chosen.date, feast: { name: chosen.name, title: chosen.title, word: chosen.word, img: chosen.img, imgAi: !!chosen.imgAi, url: chosen.sourceUrl, praise: chosen.praise, praiseTitle: chosen.praiseTitle, praiseText: chosen.praiseText, praiseId: chosen.praiseId, person: chosen.id } } : null;
     var block = feastsBlock(month, function (f) { BR.feastPick = f.date; A.render(); });
     if (!chosen) { r.append(block); }
     else {

@@ -29036,10 +29036,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var pub = published && published.published ? published.feasts : null;
     var list = (suggested || []).filter(keep).map(function (f) {
       var on = pub ? pub.some(function (p) { return p.date === f.date && p.name === f.name; }) : f.on !== false;
-      return { date: f.date, name: f.name, title: f.title || '', word: f.word, sourceUrl: f.sourceUrl || f.url, img: f.img || null, imgAi: !!(f.img && f.imgAi), praise: f.praise || null, praiseTitle: f.praiseTitle || null, praiseText: f.praiseText || null, others: f.others || [], on: on };
+      return { date: f.date, name: f.name, title: f.title || '', word: f.word, sourceUrl: f.sourceUrl || f.url, img: f.img || null, imgAi: !!(f.img && f.imgAi), praise: f.praise || null, praiseTitle: f.praiseTitle || null, praiseText: f.praiseText || null, praiseId: f.praiseId || null, id: f.id || f.person || undefined, kind: f.kind || undefined, others: f.others || [], on: on };
     });
     (pub || []).forEach(function (p) {
-      if (!list.some(function (f) { return f.date === p.date && f.name === p.name; })) list.push({ date: p.date, name: p.name, title: p.title || '', word: p.word, sourceUrl: p.url, img: p.img || null, imgAi: !!(p.img && p.imgAi), praise: p.praise || null, praiseTitle: p.praiseTitle || null, praiseText: p.praiseText || null, others: [], on: true });
+      if (!list.some(function (f) { return f.date === p.date && f.name === p.name; })) list.push({ date: p.date, name: p.name, title: p.title || '', word: p.word, sourceUrl: p.url, img: p.img || null, imgAi: !!(p.img && p.imgAi), praise: p.praise || null, praiseTitle: p.praiseTitle || null, praiseText: p.praiseText || null, praiseId: p.praiseId || null, id: p.person || undefined, kind: p.kind || undefined, others: [], on: true });
     });
     list.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
     var state = { list: list, published: null, loading: false, error: null };
@@ -29063,7 +29063,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         var same = list.filter(function (x) { return x.date === f.date; })[0];
         if (!same) { list.push(f); return; }
         // P4: the same person that day → the album's picture (and its «صورة تعبيرية») over the suggestion's older copy
-        if (f.img && (same.id ? same.id === f.id : same.name === f.name)) { same.img = f.img; same.imgAi = !!f.imgAi; }
+        var mine = same.id ? same.id === f.id : same.name === f.name;
+        if (f.img && mine) { same.img = f.img; same.imgAi = !!f.imgAi; }
+        // P5b: the same person that day → the words written for that day, and its praise in full, over the suggestion's
+        if (mine) { same.id = f.id; same.kind = f.kind; if (f.ownWord) same.word = f.word; if (f.praiseId) { same.praise = f.praise; same.praiseTitle = f.praiseTitle; same.praiseText = f.praiseText; same.praiseId = f.praiseId; } }
       });
       BR.feasts[month] = feastsFrom(month, list, both[1]);
       A.render();
@@ -29089,7 +29092,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           f.img ? el('img', { src: /^\/media\/\d{4}\/[a-z]{3}-[a-z0-9]{8}\.(webp|jpg)$/.test(f.img) ? f.img.replace(/\.(webp|jpg)$/, '-480.$1') : f.img, alt: '', width: '44', height: '44', loading: 'lazy', referrerpolicy: 'no-referrer' }) : null,
           el('span', {}, el('b', { text: dateWord(f.date) + ' · ' + f.name }), el('small', { text: f.title || '' }),
             // the saints registry (owner 2026-11-19): the saint's praise, and who else is remembered that day
-            el('small', { class: 'ba-feast__praise', text: f.praiseText ? '♫ ' + f.praiseText.split('\n')[0] : 'من غير تمجيد' }),
+            el('small', { class: 'ba-feast__praise', text: f.praiseText ? '♫ ' + f.praiseText.split('\n')[0] + (f.praiseId ? ' · كامل على صفحتنا' : '') : 'من غير تمجيد' }),
+            // P5b: the day's «نحب نفكّرك» words, so the owner reads them before publishing
+            f.word ? el('small', { class: 'ba-feast__word', text: f.word.split('\n')[0].slice(0, 140) + (f.word.length > 140 ? '…' : '') }) : null,
             f.others && f.others.length ? el('small', { text: 'ونفس اليوم: ' + f.others.join('، ') }) : null)),
         onPick ? btn('معاينة', 'phone', 'btn--sm btn--ghost', { 'data-act': 'bread-feast-preview', onclick: function () { onPick(f); } }) : null);
     });
@@ -29102,7 +29107,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       el('div', { class: 'ba-actions' }, toggle, el('span', { class: 'sp' }),
         same ? tag(on.length ? 'اتنشرت ✓' : 'اتنشرت فاضية: مفيش عيد ظاهر', 'ok') : st.published !== null ? tag('فيه تعديل مش منشور', 'warn') : null,
         btn(label, 'check', 'btn--primary btn--sm', { 'data-act': 'bread-feasts', disabled: same || (st.published === null && !on.length), onclick: function (event) {
-          var body = { month: month, feasts: on.map(function (f) { return { date: f.date, name: f.name, title: f.title || undefined, word: f.word, url: f.sourceUrl, img: f.img || undefined, imgAi: f.img && f.imgAi ? true : undefined, praise: f.praise || undefined, praiseTitle: f.praiseText ? f.praiseTitle || undefined : undefined, praiseText: f.praiseText || undefined, person: f.id || undefined, kind: f.id ? f.kind || undefined : undefined }; }) };
+          var body = { month: month, feasts: on.map(function (f) { return { date: f.date, name: f.name, title: f.title || undefined, word: f.word, url: f.sourceUrl, img: f.img || undefined, imgAi: f.img && f.imgAi ? true : undefined, praise: f.praise || undefined, praiseTitle: f.praiseText ? f.praiseTitle || undefined : undefined, praiseText: f.praiseText || undefined, praiseId: f.praiseText && f.id ? f.praiseId || undefined : undefined, person: f.id || undefined, kind: f.id ? f.kind || undefined : undefined }; }) };
           A.withBusy(event.currentTarget, api('POST', 'feasts', body).then(function () { st.published = key; A.toast('اتنشرت أعياد ' + monthName(month)); A.render(); })).catch(function (error) { A.fail(error); });
         } }))
     ]);
@@ -29129,7 +29134,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var list = st && st.list ? st.list : [];
     var chosen = list.filter(function (f) { return f.date === BR.feastPick; })[0] || list[0] || null;
     BR.feastPick = chosen ? chosen.date : null;
-    BR.previewDay = chosen ? { feastOnly: true, date: chosen.date, feast: { name: chosen.name, title: chosen.title, word: chosen.word, img: chosen.img, imgAi: !!chosen.imgAi, url: chosen.sourceUrl, praise: chosen.praise, praiseTitle: chosen.praiseTitle, praiseText: chosen.praiseText } } : null;
+    BR.previewDay = chosen ? { feastOnly: true, date: chosen.date, feast: { name: chosen.name, title: chosen.title, word: chosen.word, img: chosen.img, imgAi: !!chosen.imgAi, url: chosen.sourceUrl, praise: chosen.praise, praiseTitle: chosen.praiseTitle, praiseText: chosen.praiseText, praiseId: chosen.praiseId, person: chosen.id } } : null;
     var block = feastsBlock(month, function (f) { BR.feastPick = f.date; A.render(); });
     if (!chosen) { r.append(block); }
     else {
@@ -30366,7 +30371,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var f = SA.f, q = f.q.trim();
     return people().map(function (i) { return i.data; }).filter(function (p) {
       return (!f.cls || p.class === f.cls) && (!f.stat || p.status === f.stat) && (!f.cat || p.cat === f.cat)
-        && (!f.photo || (f.photo === 'yes') === !!(p.album && p.album.length)) && (!f.praise || (f.praise === 'yes') === !!p.praise)
+        && (!f.photo || (f.photo === 'yes') === !!(p.album && p.album.length)) && (!f.praise || (f.praise === 'yes') === hasPraise(p))
         && (!q || p.name.indexOf(q) >= 0);
     });
   }
@@ -30414,7 +30419,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           chip(cats()[p.cat] || p.cat, 'off'),
           p.status === 'incomplete' ? chip('ناقص: ' + p.missing.map(function (m) { return MISS[m]; }).join('، '), 'warn') : null,
           p.feasts.length ? chip(p.feasts.length === 1 ? 'يوم واحد' : ar(p.feasts.length) + ' أيام', 'info') : null,
-          p.praise ? chip('تمجيد', 'info') : null,
+          hasPraise(p) ? chip('تمجيد', 'info') : (p.praises && p.praises.length ? chip('تمجيد مرشح', 'warn') : null),
           p.album.length ? chip(ar(p.album.length) + ' صور', 'off') : null,
           st !== 'published' ? chip('مش منشور', 'warn') : null),
         el('span', { class: 'ycard__phone sa-next' }, line)),
@@ -30575,7 +30580,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           el('small', { text: 'الشخص محفوظ ومش هيتشال. أول ما تضيف يوم بمصدره وتنشر، بيدخل الأعياد التلقائية لوحده، من غير كود ولا استيراد.' })),
         K.btn('ضيف يوم', 'plus', 'btn--primary', { 'data-act': 'saints-addday', onclick: function () { dayModal(-1); } })));
     }
-    r.append(K.cols('sa-cols', K.stack(daysCard(p, living), msCard(p), basicsCard(p, living)), K.stack(albumCard(p), praiseCard(p, living), pendingCard(p))));
+    r.append(K.cols('sa-cols', K.stack(daysCard(p, living), msCard(p), basicsCard(p, living)), K.stack(albumCard(p), praisesCard(p, living), pendingCard(p))));
   }
 
   function daysCard(p, living) {
@@ -30650,10 +30655,43 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         K.note('info', 'الصور من فولدرك متسجلة (P2)، وبتدخل مكتبة الصور في P4. أي صورة جديدة: من المكتبة، وتتظبط زي الصورة الشخصية.')]);
   }
 
-  function praiseCard(p, living) {
-    var edit = function () {
+  /*
+   * P5b (owner 2026-11-25): the praises actually sung in our churches — several per person (تمجيد، مديح، تسبحة،
+   * ذكصولوجية، إبصالية، لحن), one main and others for a day or a season. «مرشح» stays here only; the site shows only
+   * «مؤكد», with its text. Until one is confirmed, the old excerpt (p.praise) keeps showing as before.
+   */
+  var PR_TYPES = [['tamgeed', 'تمجيد'], ['madih', 'مديح'], ['tasbeha', 'تسبحة'], ['doxology', 'ذكصولوجية'], ['psali', 'إبصالية'], ['lahn', 'لحن']];
+  var PR_TYPE = {}; PR_TYPES.forEach(function (t) { PR_TYPE[t[0]] = t[1]; });
+  function confirmedOf(p) { return (p.praises || []).filter(function (q) { return q.status === 'confirmed' && q.verses && q.verses.length; }); }
+  function hasPraise(p) { return !!p.praise || confirmedOf(p).length > 0; }
+  function versesText(v) { return (v || []).map(function (x) { return x.join('\n'); }).join('\n\n'); }
+  function readVerses(t) {
+    var out = [];
+    String(t || '').replace(/\r/g, '').split(/\n\s*\n/).forEach(function (b) {
+      var lines = b.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+      for (var i = 0; i < lines.length; i += (lines.length > 6 ? 4 : 6)) out.push(lines.slice(i, i + (lines.length > 6 ? 4 : 6)));
+    });
+    return out;
+  }
+  function praisesCard(p, living) {
+    var list = p.praises || [];
+    var rows = list.map(function (q, i) {
+      return el('li', { class: 'sa-pr' + (q.status === 'confirmed' ? ' is-ok' : '') },
+        el('span', { class: 'sa-pr__main' },
+          el('span', { class: 'sa-pr__tags' }, chip(PR_TYPE[q.type] || q.type, 'info'), q.status === 'confirmed' ? chip('مؤكد · بيظهر', 'ok') : chip('مرشح · مستني مراجعتك', 'warn'), q.main ? chip('الأساسي', 'gold') : null),
+          el('b', { text: q.title }),
+          (q.days && q.days.length) || q.context ? el('small', { class: 'sa-pr__when', text: [(q.days || []).join('، '), q.context || ''].filter(Boolean).join(' · ') }) : null,
+          el('span', { class: 'sa-src' }, icon('link'), el('span', { text: host(q.source) + (q.verses && q.verses.length ? ' · ' + ar(q.verses.length) + ' مقطع' : ' · من غير نص لسه') }))),
+        K.btn('عدّل', 'edit', 'btn--sm btn--ghost', { 'data-act': 'saints-praise', onclick: function () { praiseModal(i); } }));
+    });
+    var legacy = p.praise && !confirmedOf(p).length
+      ? el('div', { class: 'sa-pr-old' }, el('p', { class: 'muted', text: 'اللي ظاهر على الموقع دلوقتي (لحد ما تأكد واحد من فوق):' }),
+        el('blockquote', { class: 'sa-praise', text: p.praise.text.split('\n').slice(0, 4).join('\n') + (p.praise.text.split('\n').length > 4 ? '\n…' : '') }),
+        el('p', { class: 'sa-src' }, icon('link'), el('span', { text: host(p.praise.source) }), K.btn('عدّل', 'edit', 'btn--sm btn--ghost', { onclick: legacyEdit })))
+      : null;
+    function legacyEdit() {
       var t = area_(p.praise && p.praise.text, 8), s = ltr(p.praise && p.praise.source, { placeholder: 'https://…' }), ti = input(p.praise && p.praise.title, { placeholder: 'اختياري' });
-      form('التمجيد', 'music', el('div', { class: 'ba-dayform' }, field('النص', t, 'لحد ١٥٠٠ حرف'), field('المصدر', s, 'https لازم'), field('العنوان', ti)), 'تمام').then(function (ok) {
+      form('التمجيد القديم', 'music', el('div', { class: 'ba-dayform' }, field('النص', t, 'لحد ١٥٠٠ حرف. فاضي = يتشال'), field('المصدر', s, 'https لازم'), field('العنوان', ti)), 'تمام').then(function (ok) {
         if (!ok) return;
         if (!t.value.trim()) { delete p.praise; touched(); return; }
         if (!URL_RE.test(s.value.trim())) { A.toast('مصدر التمجيد لازم رابط https', 'error'); return; }
@@ -30661,10 +30699,59 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         if (ti.value.trim()) p.praise.title = ti.value.trim();
         touched();
       });
-    };
-    return K.card('music', 'التمجيد', p.praise ? '' : 'اختياري', p.praise ? K.btn('عدّل', 'edit', 'btn--sm btn--ghost', { onclick: edit }) : K.btn('ضيف تمجيد', 'plus', 'btn--sm', { onclick: edit }),
-      p.praise ? [el('blockquote', { class: 'sa-praise', text: p.praise.text.split('\n').slice(0, 4).join('\n') + (p.praise.text.split('\n').length > 4 ? '\n…' : '') }), el('p', { class: 'sa-src' }, icon('link'), el('span', { text: host(p.praise.source) }))]
-        : el('p', { class: 'muted sa-pad', text: living ? 'الآباء الأحياء مالهمش تمجيد.' : 'من غير تمجيد. الكارت بيظهر عادي.' }));
+    }
+    var add = living ? null : K.btn('ضيف', 'plus', 'btn--sm', { 'data-act': 'saints-addpraise', onclick: function () { praiseModal(-1); } });
+    return K.card('music', 'التماجيد والمدائح', living ? '' : 'المشهور اللي بيتقال في الكنيسة بس. الأساسي بيظهر في أيامه، وتقدر تخصّص واحد ليوم أو مناسبة', add,
+      [rows.length ? el('ul', { class: 'sa-prs' }, rows) : el('p', { class: 'muted sa-pad', text: living ? 'الآباء الأحياء مالهمش تمجيد.' : 'مفيش تمجيد معروف لسه. الكارت بيظهر عادي من غيره.' }), legacy]);
+  }
+  function praiseModal(i) {
+    var p = SA.form;
+    var q = i >= 0 ? p.praises[i] : { type: 'tamgeed', title: '', source: '', status: 'candidate' };
+    var type = q.type, status = q.status;
+    var title = input(q.title, { placeholder: 'زي «السلام لك يا جاورجيوس»', 'data-field': 'title' });
+    var src = ltr(q.source, { placeholder: 'https://…', 'data-field': 'source' });
+    var more = area_((q.more || []).join('\n'), 2); more.classList.add('input--ltr'); more.dir = 'ltr';
+    var main = el('input', { type: 'checkbox', checked: !!q.main });
+    var kinds = []; p.feasts.forEach(function (f) { if (kinds.indexOf(f.kind) < 0) kinds.push(f.kind); });
+    var days = kinds.map(function (k) { return el('label', { class: 'sa-check' }, el('input', { type: 'checkbox', value: k, checked: (q.days || []).indexOf(k) >= 0 }), el('span', { text: k })); });
+    var context = input(q.context, { placeholder: 'اختياري: تسبحة كيهك، سهرات العذراء، صوم الرسل…' });
+    var refrain = input(q.refrain, { placeholder: 'اختياري: المرد بعد كل مقطع' });
+    var text = area_(versesText(q.verses), 10); text.setAttribute('data-field', 'verses');
+    var body = el('div', { class: 'ba-dayform sa-dayform' },
+      field('النوع', seg('النوع', PR_TYPES, type, function (v) { type = v; })),
+      field('العنوان', title), field('المصدر', src, 'https لازم: الصفحة اللي فيها النص'), field('مصادر زيادة', more, 'اختياري، رابط في كل سطر'),
+      field('الحالة', seg('الحالة', [['candidate', 'مرشح (للإدارة بس)'], ['confirmed', 'مؤكد (بيظهر للشباب)']], status, function (v) { status = v; }), 'المرشح ميظهرش على الموقع لحد ما تأكده'),
+      el('label', { class: 'sa-check' }, main, el('span', { text: 'التمجيد الأساسي للشخص (في كل أيامه اللي مالهاش تمجيد مخصص)' })),
+      kinds.length ? el('div', { class: 'field' }, el('span', { class: 'field__label', text: 'مخصص لأيام' }), el('div', { class: 'sa-checks' }, days), el('span', { class: 'field__hint', text: 'اختياري: اليوم ده يظهر فيه التمجيد ده بدل الأساسي' })) : null,
+      field('المناسبة أو الطقس', context), field('المرد', refrain),
+      field('النص', text, 'كل مقطع في فقرة، وسطر فاضي بين المقاطع. المؤكد لازم يبقى معاه النص'),
+      i >= 0 ? el('div', {}, K.btn('شيل ده', 'trash', 'btn--sm btn--ghost sa-danger', { onclick: function (e) { p.praises.splice(i, 1); if (!p.praises.length) delete p.praises; e.target.closest('dialog').querySelector('.modal__actions .btn').click(); touched(); } })) : null);
+    var moreList = function () { return more.value.split(/\s+/).map(function (x) { return x.trim(); }).filter(Boolean); };
+    form(i >= 0 ? 'تمجيد · ' + p.name : 'تمجيد جديد · ' + p.name, 'music', body, 'احفظ', function () {
+      if (!title.value.trim()) return { message: 'اكتب عنوان التمجيد أو أوله.', field: title };
+      if (!URL_RE.test(src.value.trim())) return { message: 'المصدر لازم رابط https للصفحة اللي فيها النص.', field: src };
+      if (moreList().some(function (u) { return !URL_RE.test(u); })) return { message: 'المصادر الزيادة لازم روابط https.', field: more };
+      if (status === 'confirmed' && !readVerses(text.value).length) return { message: 'المؤكد بيظهر للشباب كامل، فلازم تحط النص.', field: text };
+      return '';
+    }).then(function (ok) {
+      if (!ok || !SA.form) return;
+      var ids = (p.praises || []).map(function (x) { return +String(x.id).replace(/\D/g, '') || 0; });
+      var v = { id: i >= 0 ? q.id : 'pr' + (Math.max.apply(null, [0].concat(ids)) + 1), type: type, title: title.value.trim(), source: src.value.trim(), status: status };
+      if (moreList().length) v.more = moreList();
+      if (main.checked) v.main = true;
+      var ds = days.map(function (d) { return d.firstChild; }).filter(function (c) { return c.checked; }).map(function (c) { return c.value; });
+      if (ds.length) v.days = ds;
+      if (context.value.trim()) v.context = context.value.trim();
+      if (refrain.value.trim()) v.refrain = refrain.value.trim();
+      var vs = readVerses(text.value);
+      if (vs.length) { v.verses = vs; v.opening = vs[0][0]; }
+      if (q.author) v.author = q.author;
+      if (q.note) v.note = q.note;
+      p.praises = p.praises || [];
+      if (v.main) p.praises.forEach(function (x) { delete x.main; });
+      if (i >= 0) p.praises[i] = v; else p.praises.push(v);
+      touched();
+    });
   }
 
   function pendingCard(p) {
@@ -30749,9 +30836,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var more = area_((f.more || []).join('\n'), 2); more.classList.add('input--ltr'); more.dir = 'ltr';
     var title = input(f.title, { placeholder: 'اختياري: علشان كلمة الأنبا تكلا تتجاب صح' });
     var note = area_(f.note, 2);
+    var word = area_(f.word, 6); word.setAttribute('data-field', 'word');
     var body = el('div', { class: 'ba-dayform sa-dayform' }, field('النوع', kind), dates.node,
       srcBox.node, field('مصادر زيادة', more, 'اختياري، رابط في كل سطر'),
-      field('عنوانه في السنكسار', title), field('ملحوظة', note, 'اختياري: لو المصادر مختلفة'),
+      field('عنوانه في السنكسار', title), field('كلام «نحب نفكّرك»', word, 'اللي بيظهر للشباب في كارت اليوم. فاضي = كلمة السنكسار'), field('ملحوظة', note, 'اختياري: لو المصادر مختلفة'),
       i >= 0 ? el('div', {}, K.btn('شيل اليوم ده', 'trash', 'btn--sm btn--ghost sa-danger', { onclick: function (e) { p.feasts.splice(i, 1); e.target.closest('dialog').querySelector('.modal__actions .btn').click(); touched(); } })) : null);
     var moreList = function () { return more.value.split(/\s+/).map(function (x) { return x.trim(); }).filter(Boolean); };
     form(i >= 0 ? 'يوم · ' + p.name : 'يوم جديد · ' + (p.name || 'شخص جديد'), i >= 0 ? 'edit' : 'plus', body, 'احفظ اليوم', function () {
@@ -30766,6 +30854,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       if (m.length) v.more = m;
       if (title.value.trim()) v.title = title.value.trim();
       if (note.value.trim()) v.note = note.value.trim();
+      if (word.value.trim()) v.word = word.value.trim();
       if (i >= 0) p.feasts[i] = v; else p.feasts.push(v);
       touched();
     });

@@ -1,0 +1,119 @@
+#!/usr/bin/env node
+/*
+ * «خبزنا اليومي» P5b — the one-time seed of the saints' day words and praises → worker/migrations/0038_bread_praises.sql.
+ *
+ *   node bread-p5b-seed.mjs            write the migration (and daily-bread/saints/texts-seed.json, the checked texts)
+ *   node bread-p5b-seed.mjs --check    the migration in the repo is the seed (exit 1 if not)
+ *
+ * - The 137 «نحب نفكّرك» texts the owner brought (his GPT, 2026-11-25; khobzna-work/p5b/texts) → feasts[i].word of that
+ *   person's day. A text says its day («الموافق ١٢ هاتور»): matched by person + kind + that date, never by kind alone
+ *   (Michael has two «عيده», Gabriel three «تذكاره»). Only where the day has no word yet: what the owner wrote stays.
+ * - The praises (daily-bread/saints/praises-seed.json, tools/bread-praise-seed.mjs) → $.praises, only where the person
+ *   has no list yet. Candidates stay in the admin; the site shows only what the owner confirmed.
+ * - «مناسبات كنيستنا» (the occasions, the owner's own words) are never touched.
+ * - rev + 1 on every person changed, so «راجع وانشر» shows them. Nothing reaches the site before publishing.
+ * Everything is checked with the Worker's own rules (checkPerson) on the published registry.
+ */
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { checkPerson } from '../worker/src/bread/saints.js';
+import { MONTHS } from '../worker/src/bread/coptic.js';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const IN = process.env.P5B_DIR || 'D:/private_projects/khobzna-work/p5b';
+export const TEXTS = path.join(ROOT, 'daily-bread', 'saints', 'texts-seed.json');
+export const PRAISES = path.join(ROOT, 'daily-bread', 'saints', 'praises-seed.json');
+export const OUT = path.join(ROOT, 'worker', 'migrations', '0038_bread_praises.sql');
+const BY = 'P5b seed';
+const q = s => "'" + String(s).replace(/'/g, "''") + "'";
+
+const norm = s => String(s).replace(/ـ/g, '').replace(/[ةه]$/u, 'ه').replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/\s+/g, '');
+const COPTIC = MONTHS.map(norm);
+const GREG = ['يناير', 'فبراير', 'مارس', 'ابريل', 'مايو', 'يونيو', 'يوليو', 'اغسطس', 'سبتمبر', 'اكتوبر', 'نوفمبر', 'ديسمبر'];
+const digits = s => Number(String(s).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
+/* «الموافق ١٢ هاتور» → { coptic: '3-12' } | { gregorian: '07-06' } | null */
+export function dateOf(text) {
+  const m = /الموافق\s+([0-9٠-٩]{1,2})\s+([^\s،,.]+)/.exec(text);
+  if (!m) return null;
+  const n = digits(m[1]), w = norm(m[2]);
+  const c = COPTIC.indexOf(w);
+  if (c >= 0) return { coptic: `${c + 1}-${n}` };
+  const g = GREG.indexOf(w);
+  if (g >= 0) return { gregorian: `${String(g + 1).padStart(2, '0')}-${String(n).padStart(2, '0')}` };
+  return null;
+}
+
+/* the owner's texts → [{ person, kind, at, text }] with the feast index, or throws with every problem */
+export function placeTexts(texts, people) {
+  const errs = [], out = [];
+  for (const t of texts) {
+    const p = people.find(x => x.id === t.id);
+    const d = dateOf(t.text || '');
+    if (!p) { errs.push(`${t.id}: not in the registry`); continue; }
+    if (!d) { errs.push(`${t.id} ${t.kind}: no «الموافق» date`); continue; }
+    const hits = p.feasts.map((f, i) => ({ f, i })).filter(({ f }) => f.kind === t.kind && (d.coptic ? f.coptic === d.coptic : f.gregorian === d.gregorian));
+    if (hits.length !== 1) { errs.push(`${t.id} ${t.kind} ${JSON.stringify(d)}: ${hits.length} days`); continue; }
+    const text = String(t.text).replace(/\r\n/g, '\n').trim();
+    if (/[\u{1F300}-\u{1FAFF}]/u.test(text)) errs.push(`${t.id} ${t.kind}: emoji`);
+    out.push({ person: p.id, kind: t.kind, at: hits[0].i, ...d, text });
+  }
+  const seen = new Set();
+  for (const x of out) { const k = x.person + '/' + x.at; if (seen.has(k)) errs.push(`${k}: two texts`); seen.add(k); }
+  if (errs.length) throw new Error('the texts have problems:\n' + errs.join('\n'));
+  return out;
+}
+
+export function seedSql(texts, praises, people) {
+  const errs = [];
+  const byPerson = new Map();
+  for (const t of texts) (byPerson.get(t.person) || byPerson.set(t.person, []).get(t.person)).push(t);
+  for (const id of Object.keys(praises)) if (!byPerson.has(id)) byPerson.set(id, []);
+  for (const [id, list] of byPerson) {
+    const p = structuredClone(people.find(x => x.id === id));
+    if (!p) { errs.push(id + ': not in the registry'); continue; }
+    for (const t of list) p.feasts[t.at].word = t.text;
+    // the published file leaves out a milestone's status (admin only): not what this seed checks
+    for (const m of p.milestones || []) if (!m.status) m.status = 'confirmed';
+    if (praises[id]) p.praises = praises[id];
+    errs.push(...checkPerson(p, { cats: { [p.cat]: 'x' }, statusTyped: false }).map(e => id + ': ' + e));
+  }
+  if (errs.length) throw new Error('the seed has problems:\n' + errs.join('\n'));
+  const out = [
+    '-- «خبزنا اليومي» P5b: the saints\' day words («نحب نفكّرك») and praises. Generated by tools/bread-p5b-seed.mjs from',
+    '-- daily-bread/saints/texts-seed.json + praises-seed.json — do not edit by hand. Additive: only empty words, only',
+    '-- people with no praises list; the occasions are not touched. A second run changes nothing.'
+  ];
+  for (const [id, list] of [...byPerson].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
+    for (const t of list) {
+      const f = `$.feasts[${t.at}]`;
+      const day = t.coptic ? `json_extract(data, '${f}.coptic') = ${q(t.coptic)}` : `json_extract(data, '${f}.gregorian') = ${q(t.gregorian)}`;
+      out.push(`UPDATE saints_items SET data = json_set(data, '${f}.word', ${q(t.text)}), rev = rev + 1, updated_at = 0, updated_by = ${q(BY)} WHERE kind = 'person' AND id = ${q(id)} AND json_extract(data, '${f}.kind') = ${q(t.kind)} AND ${day} AND json_extract(data, '${f}.word') IS NULL;`);
+    }
+    if (praises[id]) out.push(`UPDATE saints_items SET data = json_set(data, '$.praises', json(${q(JSON.stringify(praises[id]))})), rev = rev + 1, updated_at = 0, updated_by = ${q(BY)} WHERE kind = 'person' AND id = ${q(id)} AND json_extract(data, '$.praises') IS NULL;`);
+  }
+  return out.join('\n') + '\n';
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const people = JSON.parse(fs.readFileSync(path.join(ROOT, 'daily-bread', 'data', 'saints.json'), 'utf8')).people;
+  const check = process.argv.includes('--check');
+  let texts;
+  if (check || !fs.existsSync(path.join(IN, 'texts'))) texts = JSON.parse(fs.readFileSync(TEXTS, 'utf8')).texts;
+  else {
+    const dir = path.join(IN, 'texts', 'khobzna-texts-all');
+    const raw = fs.readdirSync(dir).filter(f => /^khobzna-texts-batch-\d+\.json$/.test(f)).sort().flatMap(f => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')));
+    texts = placeTexts(raw, people);
+    fs.writeFileSync(TEXTS, JSON.stringify({ about: 'P5b: the «نحب نفكّرك» day texts the owner brought (his GPT, 2026-11-25), placed by person + kind + date. 0038 sets a day\'s word only if it has none.', texts }, null, 1) + '\n');
+  }
+  const praises = JSON.parse(fs.readFileSync(PRAISES, 'utf8')).praises;
+  const sql = seedSql(texts, praises, people);
+  if (check) {
+    const now = fs.existsSync(OUT) ? fs.readFileSync(OUT, 'utf8').replace(/\r\n/g, '\n') : '';
+    if (now !== sql) { console.error('0038_bread_praises.sql is not the seed: run node tools/bread-p5b-seed.mjs'); process.exit(1); }
+    console.log('0038_bread_praises.sql = the seed ✓');
+  } else {
+    fs.writeFileSync(OUT, sql);
+    console.log('wrote', path.relative(ROOT, OUT), texts.length, 'texts,', Object.keys(praises).length, 'people with praises');
+  }
+}

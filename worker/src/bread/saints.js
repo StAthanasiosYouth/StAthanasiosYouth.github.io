@@ -25,6 +25,12 @@
  *   notify?  reserved for P6 (the automatic notifications), ignored in P5
  * And a praise may carry its full text (owner 2026-11-25: every praise in full on our own page):
  *   praise { text, source, title?, refrain?, verses?: [[line…]…] }   text = the short excerpt the card shows
+ * P5b (owner 2026-11-25): each day may carry its own words for «نحب نفكّرك» (feasts[].word), and a person may have
+ * several praises — the ones actually sung, not any madih with the name — one main, others for a day or a season:
+ *   praises? [{ id, type: tamgeed|madih|tasbeha|doxology|psali|lahn, title, source, more?, status: confirmed|candidate,
+ *              main?, days? [feast kind], context?, opening?, author?, refrain?, verses? [[line…]…], note? }]
+ *   candidate = in the admin only, never on the site; confirmed needs its text. The legacy `praise` stays the card's
+ *   praise until a confirmed one exists (nothing is replaced before the owner confirms).
  */
 import { daysOfMonth, monthDays, toCoptic } from './coptic.js';
 
@@ -37,7 +43,9 @@ export const ALBUM_TYPES = ['ai', 'photo', 'art'];
 export const SITE_MEDIA_IMG = /^\/media\/\d{4}\/[a-z]{3}-[a-z0-9]{8}\.(?:webp|jpg)$/;
 export const IMG_DIR = 'assets/img/saints/';
 export const ID_RE = /^[a-z0-9]+$/;
-export const LIMITS = { name: 120, kind: 120, title: 200, note: 1500, need: 400, praise: 1500, word: 2000, stage: 80, caption: 200, src: 300, album: 40, feasts: 12, milestones: 40, sources: 20, more: 10, headline: 160, lead: 700, badge: 60, pictures: 12, covers: 6, verses: 150, verse: 6, line: 200, praiseFull: 20000 };
+export const LIMITS = { name: 120, kind: 120, title: 200, note: 1500, need: 400, praise: 1500, word: 2000, stage: 80, caption: 200, src: 300, album: 40, feasts: 12, milestones: 40, sources: 20, more: 10, headline: 160, lead: 700, badge: 60, pictures: 12, covers: 6, verses: 150, verse: 6, line: 200, praiseFull: 20000, praises: 12 };
+export const PRAISE_TYPES = ['tamgeed', 'madih', 'tasbeha', 'doxology', 'psali', 'lahn'];
+export const PRAISE_STATUS = ['confirmed', 'candidate'];
 export const OCC_TYPES = ['patron', 'family', 'diocese', 'fathers', 'church', 'local'];
 export const OCC_LOOKS = ['pope', 'bishop', 'memorial'];
 export const OCC_TYPE_NAMES = { patron: 'شفيع كنيستنا', family: 'شفيع أسرتنا', diocese: 'إيبارشيتنا وآباؤها الأساقفة', fathers: 'آباء كنيستنا', church: 'تاريخ كنيستنا', local: 'تذكار عندنا' };
@@ -120,7 +128,7 @@ export function checkPerson(p, { cats = {}, imageExists = null, pictureExists = 
   if (!cats[p.cat]) e(`المجموعة «${p.cat}» مش في categories.`);
   if (!CLASSES.includes(p.class)) e(`class لازم ${CLASSES.join(' أو ')}.`);
   if (!Array.isArray(p.feasts) || p.feasts.length > LIMITS.feasts) { e(`feasts لازم قايمة (ممكن تبقى فاضية، لحد ${LIMITS.feasts}).`); return errs; }
-  for (const f of p.feasts) checkDay(f, e);
+  for (const f of p.feasts) { checkDay(f, e); if (!optText(f.word, LIMITS.word)) e(`«${f.kind}»: كلام «نحب نفكّرك» طويل (لحد ${LIMITS.word} حرف).`); }
   if (statusTyped) {
     const want = missingOf(p);
     if (!Array.isArray(p.missing) || p.missing.join() !== want.join()) e(`missing لازم [${want.join(', ')}].`);
@@ -149,6 +157,31 @@ export function checkPerson(p, { cats = {}, imageExists = null, pictureExists = 
   if (!Array.isArray(p.album) || p.album.length > LIMITS.album) e(`album لازم قايمة (لحد ${LIMITS.album}).`);
   for (const a of Array.isArray(p.album) ? p.album : []) checkAlbumItem(a, e, { pictureExists });
   if (Array.isArray(p.album) && p.album.filter(a => a && a.main).length > 1) e('album: صورة أساسية واحدة بس.');
+  if (p.praises != null) {
+    if (!Array.isArray(p.praises) || p.praises.length > LIMITS.praises) e(`التماجيد لازم قايمة (لحد ${LIMITS.praises}).`);
+    const kinds = new Set(p.feasts.map(f => f.kind));
+    const ids = new Set();
+    for (const q of Array.isArray(p.praises) ? p.praises : []) {
+      const w = `تمجيد «${(q && q.title) || '?'}»`;
+      if (!q || typeof q.id !== 'string' || !ID_RE.test(q.id) || ids.has(q.id)) { e(w + ': id مش صح أو متكرر.'); continue; }
+      ids.add(q.id);
+      if (!PRAISE_TYPES.includes(q.type)) e(w + ': النوع مش معروف.');
+      if (!text(q.title, LIMITS.title)) e(w + ': العنوان فاضي أو طويل.');
+      if (typeof q.source !== 'string' || !URL_RE.test(q.source)) e(w + ': المصدر لازم رابط https.');
+      for (const u of q.more || []) if (typeof u !== 'string' || !URL_RE.test(u)) e(w + ': رابط زيادة مش https.');
+      if (!PRAISE_STATUS.includes(q.status)) e(w + ': الحالة لازم مؤكد أو مرشح.');
+      if (q.main != null && typeof q.main !== 'boolean') e(w + ': «الأساسي» لازم آه أو لأ.');
+      if (q.days != null && (!Array.isArray(q.days) || !q.days.every(k => kinds.has(k)))) e(w + ': أيام مش موجودة عند الشخص.');
+      if (!optText(q.context, LIMITS.title) || !optText(q.opening, LIMITS.line) || !optText(q.author, LIMITS.name) || !optText(q.refrain, LIMITS.line) || !optText(q.note, LIMITS.note)) e(w + ': خانة طويلة.');
+      if (q.verses != null) {
+        const ok = Array.isArray(q.verses) && q.verses.length <= LIMITS.verses && q.verses.every(v => Array.isArray(v) && v.length > 0 && v.length <= LIMITS.verse && v.every(l => text(l, LIMITS.line)));
+        if (!ok) e(w + `: النص لازم مقاطع (لحد ${LIMITS.verses})، وكل مقطع من ١ لـ${LIMITS.verse} أبيات.`);
+        else if (q.verses.flat().join('').length > LIMITS.praiseFull) e(w + ': النص طويل.');
+      }
+      if (q.status === 'confirmed' && !(Array.isArray(q.verses) && q.verses.length)) e(w + ': المؤكد لازم يبقى معاه النص.');
+    }
+    if (Array.isArray(p.praises) && p.praises.filter(q => q && q.main && q.status === 'confirmed').length > 1) e('التماجيد: تمجيد أساسي واحد بس.');
+  }
   if (p.praise != null) {
     const q = p.praise;
     if (!q || !text(q.text, LIMITS.praise)) e('التمجيد: النص فاضي أو طويل (لحد ١٥٠٠ حرف).');
@@ -289,6 +322,7 @@ export function publicFile(reg) {
     if (f.coptic) o.coptic = f.coptic; else if (f.gregorian) o.gregorian = f.gregorian;
     if (f.year != null) o.year = f.year;
     if (f.title) o.title = f.title;
+    if (f.word) o.word = f.word;
     o.source = f.source;
     return o;
   };
@@ -313,6 +347,8 @@ export function publicFile(reg) {
       if (p.praise.refrain) o.praise.refrain = p.praise.refrain;
       if (Array.isArray(p.praise.verses)) o.praise.verses = p.praise.verses;
     }
+    const sung = confirmedPraises(p).map(q => { const x = { id: q.id, type: q.type, title: q.title, source: q.source }; for (const k of ['main', 'days', 'context', 'author']) if (q[k] != null) x[k] = q[k]; return x; });
+    if (sung.length) o.praises = sung;
     if (p.image) o.image = { file: p.image.file, source: p.image.source };
     if (p.word) o.word = p.word;
     return o;
@@ -407,7 +443,11 @@ export function occasionsFile(reg) {
     const a = (p.album || []).find(x => x.main && x.media) || (p.album || []).find(x => x.media);
     const x = { id: p.id, name: p.name, days: p.feasts.map(f => ({ kind: f.kind, ...dayOut(f) })) };
     if (a) { x.img = '/' + a.media; x.ai = labelOf(a); if (a.crop) x.crop = a.crop; }
-    if (p.praise) {
+    const sang = praiseFor(p, null);   // P5b: the person's main confirmed praise, else the legacy excerpt
+    if (sang) {
+      x.praise = { title: sang.title, text: praiseTeaser(sang), source: sang.source, id: sang.id, verses: sang.verses };
+      if (sang.refrain) x.praise.refrain = sang.refrain;
+    } else if (p.praise) {
       x.praise = { title: p.praise.title || '', text: p.praise.text, source: p.praise.source };
       if (p.praise.refrain) x.praise.refrain = p.praise.refrain;
       if (Array.isArray(p.praise.verses)) x.praise.verses = p.praise.verses;
@@ -415,4 +455,36 @@ export function occasionsFile(reg) {
     patrons[o.type] = x;
   }
   return { schema: 1, types: OCC_TYPE_NAMES, occasions, patrons };
+}
+
+/* ======================================================================================================
+ * P5b — the praises actually sung, and the words of each day (owner 2026-11-25)
+ * ====================================================================================================== */
+
+/* the confirmed praises of a person (with their text): the only ones the site ever shows */
+export const confirmedPraises = p => (Array.isArray(p && p.praises) ? p.praises : []).filter(q => q && q.status === 'confirmed' && Array.isArray(q.verses) && q.verses.length);
+/*
+ * The praise of one of a person's days: a confirmed one set for that day first, then the main one, then the only one
+ * with no days of its own; none → null (the card keeps the legacy excerpt, if any, as before).
+ */
+export function praiseFor(p, kind) {
+  const list = confirmedPraises(p);
+  return list.find(q => Array.isArray(q.days) && q.days.includes(kind)) || list.find(q => q.main) || (list.length === 1 && !(list[0].days && list[0].days.length) ? list[0] : null);
+}
+/* the card's short teaser of a praise: its first verse (and its response) */
+export const praiseTeaser = q => [...q.verses[0], ...(q.refrain ? [q.refrain] : [])].join('\n');
+
+/* daily-bread/data/praises.json: the confirmed praises' text, read only when «اقرا التمجيد كامل» is pressed */
+export function praisesFile(reg) {
+  const people = {};
+  for (const p of reg.people || []) {
+    const list = confirmedPraises(p).map(q => {
+      const x = { id: q.id, type: q.type, title: q.title, source: q.source };
+      for (const k of ['main', 'days', 'context', 'author', 'refrain']) if (q[k] != null) x[k] = q[k];
+      x.verses = q.verses;
+      return x;
+    });
+    if (list.length) people[p.id] = { name: p.name, praises: list };
+  }
+  return { schema: 1, people };
 }

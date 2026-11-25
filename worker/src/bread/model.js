@@ -215,7 +215,9 @@ export function checkFeasts(body) {
     // P5: whose day it is (the registry's id and day), so «مناسبات كنيستنا» can stand for it without a second card
     const person = typeof f.person === 'string' && /^[a-z0-9]{1,40}$/.test(f.person) ? f.person : undefined;
     const kind = person && typeof f.kind === 'string' && f.kind.trim() && f.kind.length <= 120 ? f.kind.trim() : undefined;
-    out.push({ date, name: name.value, title: title.ok ? title.value : null, word: word.value, url: url.value, img: img.value || undefined, imgAi: img.value && f.imgAi === true ? true : undefined, praise: praise.value || undefined, praiseTitle: praiseTitle.value || undefined, praiseText: praiseText.value || undefined, person, kind });
+    // P5b: which of the person's praises the day shows in full (praises.json)
+    const praiseId = person && praise.value && typeof f.praiseId === 'string' && /^[a-z0-9-]{1,40}$/.test(f.praiseId) ? f.praiseId : undefined;
+    out.push({ date, name: name.value, title: title.ok ? title.value : null, word: word.value, url: url.value, img: img.value || undefined, imgAi: img.value && f.imgAi === true ? true : undefined, praise: praise.value || undefined, praiseTitle: praiseTitle.value || undefined, praiseText: praiseText.value || undefined, praiseId, person, kind });
   }
   if (errors.length) return { ok: false, errors };
   out.sort((a, b) => (a.date < b.date ? -1 : 1));

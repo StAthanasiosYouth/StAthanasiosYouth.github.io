@@ -27,12 +27,13 @@ import { retry } from '../lib/db.js';
 import { sha256 } from '../lib/hash.js';
 import { limit } from '../lib/ratelimit.js';
 import { activityStmt } from '../lib/activity.js';
-import { checkPerson, checkOccasion, check, withStatus, scheduled, feastsOfMonth, publicFile, occasionsFile, pictureFor, ID_RE } from './saints.js';
+import { checkPerson, checkOccasion, check, withStatus, scheduled, feastsOfMonth, publicFile, occasionsFile, praisesFile, praiseFor, praiseTeaser, pictureFor, ID_RE } from './saints.js';
 import { fileStmts, mirrorSoon } from './store.js';
 
-export const SAINTS_ITEM_MAX_BYTES = 32 * 1024;
+export const SAINTS_ITEM_MAX_BYTES = 128 * 1024;   // P5b: a person's praises with their text (the Virgin's are the longest)
 const KINDS = ['person', 'occasion'];
-const PERSON_KEYS = ['id', 'name', 'cat', 'class', 'feasts', 'milestones', 'sources', 'pending', 'album', 'praise', 'image', 'word', 'note'];
+const PERSON_KEYS = ['id', 'name', 'cat', 'class', 'feasts', 'milestones', 'sources', 'pending', 'album', 'praise', 'praises', 'image', 'word', 'note'];
+export const PRAISES_KEY = 'praises';   // P5b: daily-bread/data/praises.json, published with saints.json
 const OCCASION_KEYS = ['id', 'name', 'kind', 'coptic', 'gregorian', 'year', 'repeat', 'date', 'source', 'more', 'note',
   // P5: «مناسبات كنيستنا» (P5-PLAN.md §2); notify is P6's, kept as it is
   'from', 'covers', 'type', 'look', 'badge', 'honor', 'people', 'headline', 'lead', 'pictures', 'notify'];
@@ -253,6 +254,7 @@ export async function adminSaintsPublish(ctx) {
   const pub = await fileStmts(db, { key: FILE_KEY, body, by, now });
   // P5: «مناسبات كنيستنا» for the member page, in the same publish
   const occ = await fileStmts(db, { key: OCCASIONS_KEY, body: JSON.stringify(occasionsFile(r.draft)) + '\n', by, now });
+  const sung = await fileStmts(db, { key: PRAISES_KEY, body: JSON.stringify(praisesFile(r.draft)) + '\n', by, now });
   const rev = (r.snap ? r.snap.rev : 0) + 1;
   const note = noteOf(r);
   const tags = JSON.stringify(r.live);
@@ -262,6 +264,7 @@ export async function adminSaintsPublish(ctx) {
       .bind(rev, JSON.stringify(r.draft), r.draft.people.length, r.draft.occasions.length, note, pub.publishId, now, by),
     ...pub.stmts,
     ...occ.stmts,
+    ...sung.stmts,
     // exactly the versions this review saw are now published (a save in between stays «changed»)
     db.prepare("UPDATE saints_items SET pub_rev = rev WHERE deleted_ms IS NULL AND (kind || ':' || id || ':' || rev) IN (SELECT value FROM json_each(?))").bind(tags),
     db.prepare("DELETE FROM saints_items WHERE deleted_ms IS NOT NULL AND (kind || ':' || id || ':' || rev) IN (SELECT value FROM json_each(?))").bind(gone),
@@ -294,6 +297,7 @@ export async function adminSaintsRestore(ctx) {
   const body = JSON.stringify(publicFile(reg)) + '\n';
   const pub = await fileStmts(db, { key: FILE_KEY, body, by, now });
   const occ = await fileStmts(db, { key: OCCASIONS_KEY, body: JSON.stringify(occasionsFile(reg)) + '\n', by, now });
+  const sung = await fileStmts(db, { key: PRAISES_KEY, body: JSON.stringify(praisesFile(reg)) + '\n', by, now });
   const note = 'رجوع للنسخة ' + old.rev;
   await retry(() => db.batch([
     db.prepare("DELETE FROM saints_items WHERE kind IN ('person', 'occasion')"),
@@ -302,6 +306,7 @@ export async function adminSaintsRestore(ctx) {
     db.prepare('INSERT INTO saints_snapshots (rev, data, people, occasions, note, publish_id, at, by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(rev, old.data, reg.people.length, (reg.occasions || []).length, note, pub.publishId, now, by),
     ...pub.stmts,
     ...occ.stmts,
+    ...sung.stmts,
     act(ctx, 'bread.saints.restore', 'v' + rev, 'سجل الشخصيات', 'سجل الشخصيات رجع للنسخة ' + old.rev + ' (اتنشرت كنسخة ' + rev + ')')
   ]));
   await mirrorSoon(ctx.env, ctx.defer);
@@ -319,15 +324,22 @@ export async function adminSaintsFeasts(ctx) {
   const row = await retry(() => ctx.env.DB.prepare("SELECT body FROM published_revisions WHERE kind = 'bread' AND key = ? AND live = 1").bind(FILE_KEY).first());
   if (!row) return { month, ready: false, feasts: [] };
   const reg = JSON.parse(row.body);
+  // P5b: the published praises with their text (saints.json carries only their names)
+  const sungRow = await retry(() => ctx.env.DB.prepare("SELECT body FROM published_revisions WHERE kind = 'bread' AND key = ? AND live = 1").bind(PRAISES_KEY).first());
+  const sungAll = sungRow ? (JSON.parse(sungRow.body).people || {}) : {};
   const feasts = feastsOfMonth(reg, month).map(hit => {
-    const p = hit.person, f = hit.feast;
+    const f = hit.feast;
+    const p = sungAll[hit.person.id] ? { ...hit.person, praises: sungAll[hit.person.id].praises.map(q => ({ ...q, status: 'confirmed' })) } : { ...hit.person, praises: [] };
     // P4: the album's picture for this day (pictureFor), else the old St-Takla copy
     const pic = pictureFor(p, f.kind, hit.date.slice(0, 4));
+    const sang = praiseFor(p, f.kind);
     return {
       date: hit.date, on: true, id: p.id, name: p.name, kind: f.kind, title: (f.title || (f.kind + ' ' + p.name)).slice(0, 120),
-      word: p.word || `النهارده ${f.kind} ${p.name}.`, sourceUrl: f.source,
+      // P5b: the day's own words (written for «نحب نفكّرك») first
+      word: f.word || p.word || `النهارده ${f.kind} ${p.name}.`, ownWord: !!f.word, sourceUrl: f.source,
       img: pic ? pic.img : p.image ? '/' + p.image.file : null, imgAi: pic ? pic.ai : false,
-      praise: p.praise ? p.praise.source : null, praiseTitle: p.praise ? p.praise.title || null : null, praiseText: p.praise ? p.praise.text : null,
+      // P5b: the praise of that day (a confirmed one), else the legacy excerpt as before
+      ...(sang ? { praise: sang.source, praiseTitle: sang.title, praiseText: praiseTeaser(sang), praiseId: sang.id } : { praise: p.praise ? p.praise.source : null, praiseTitle: p.praise ? p.praise.title || null : null, praiseText: p.praise ? p.praise.text : null }),
       others: hit.others
     };
   });

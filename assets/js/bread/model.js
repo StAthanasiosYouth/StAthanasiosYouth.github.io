@@ -137,6 +137,8 @@ export function feastOn(file, day) {
   out.kind = out.person ? s(f.kind, 120) : '';
   if (out.praise && !HTTPS_URL.test(out.praise)) out.praise = '';
   if (!out.praise) out.praiseText = out.praiseTitle = ''; // a praise is shown only with its source
+  // P5b: the praise the day shows in full (praises.json people[person].praises[id])
+  out.praiseId = out.person && out.praise && typeof f.praiseId === 'string' && /^[a-z0-9-]{1,40}$/.test(f.praiseId) ? f.praiseId : '';
   return out;
 }
 

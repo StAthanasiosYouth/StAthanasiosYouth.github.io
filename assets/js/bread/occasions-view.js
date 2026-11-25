@@ -84,12 +84,13 @@ export function occasionCard(list, iso, { file, word = null, medText, sheet = fa
     </div></section>`;
 }
 
-/* the full praise, on our own page */
+/* the full praise, on our own page (P5b: also a saint's day praise, with its own kicker) */
+export const PRAISE_TYPE = { tamgeed: 'تمجيد', madih: 'مديح', tasbeha: 'تسبحة', doxology: 'ذكصولوجية', psali: 'إبصالية', lahn: 'لحن' };
 export function praiseSheet(p) {
   const pr = p.praise;
   return `<header class="pr__head">
       ${p.img ? `<span class="pr__face"><img src="${esc(p.img)}" alt=""${frame(p)}></span>` : '<span></span>'}
-      <div><p class="pr__kicker">${p.kind === 'family' ? 'شفيع أسرتنا' : 'شفيع كنيستنا'}</p><h2 class="pr__title" id="pr-title">${esc(pr.title || p.name)}</h2>
+      <div><p class="pr__kicker">${esc(p.kicker || (p.kind === 'family' ? 'شفيع أسرتنا' : 'شفيع كنيستنا'))}</p><h2 class="pr__title" id="pr-title">${esc(pr.title || p.name)}</h2>
         <p class="pr__meta">${AR(pr.verses.length)} مقطع${pr.refrain ? ' · المرد: ' + esc(pr.refrain) : ''}</p></div>
       <div class="pr__tools"><button class="pr__btn pr__btn--sm" type="button" data-size="-1" aria-label="صغّر الخط">أ</button><button class="pr__btn pr__btn--lg" type="button" data-size="1" aria-label="كبّر الخط">أ</button><button class="pr__btn" type="button" data-pr-close aria-label="اقفل">${si('close')}</button></div>
     </header>

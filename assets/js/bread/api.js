@@ -121,6 +121,19 @@ export async function loadFeasts(month) {
   }
 }
 
+/* P5b: the saints' praises in full (static and Worker together), read only when a day's praise is opened → file | null */
+let praisesP = null;
+export function loadPraises() {
+  if (!praisesP) {
+    const tries = [
+      getJson(new URL('daily-bread/data/praises.json', ROOT).href, WORKER_MAX_MS),
+      getJson(`${api()}/v1/bread/file/praises`, WORKER_MAX_MS)
+    ].map(p => p.then(r => (r.status === 200 && r.body && r.body.people ? r.body : null), () => null).then(t => t || Promise.reject(new Error('no'))));
+    praisesP = Promise.any(tries).catch(() => { praisesP = null; return null; });
+  }
+  return praisesP;
+}
+
 /* POST to the Worker → { ok, status, body } (never throws) */
 export async function post(path, body, { token = '', plain = false, keepalive = false } = {}) {
   try {

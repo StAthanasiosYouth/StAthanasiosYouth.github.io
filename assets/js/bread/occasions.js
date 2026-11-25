@@ -33,6 +33,18 @@ function cleanPatron(p) {
   return out.name ? out : null;
 }
 
+/*
+ * P5b: daily-bread/data/praises.json (the Worker's praisesFile) → one praise, safe, or null.
+ * { people: { id: { name, praises: [{ id, type, title, source, refrain?, verses }] } } }
+ */
+export function praiseOf(file, person, id) {
+  const p = file && file.people && typeof file.people === 'object' ? file.people[person] : null;
+  const q = p && Array.isArray(p.praises) ? p.praises.find(x => x && x.id === id) : null;
+  if (!q || !HTTPS.test(q.source || '')) return null;
+  const out = { id: q.id, type: s(q.type, 20), title: s(q.title, 200), source: q.source, refrain: s(q.refrain, 200), verses: verses(q.verses), context: s(q.context, 200), author: s(q.author, 200) };
+  return out.verses.length ? out : null;
+}
+
 /* the published file → a safe copy, or null */
 export function cleanOccasions(file) {
   if (!file || typeof file !== 'object' || !Array.isArray(file.occasions)) return null;

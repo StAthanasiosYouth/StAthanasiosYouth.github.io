@@ -55,6 +55,8 @@ export async function breadFileOccasions(ctx) {
   await requireOccasions(ctx.env.DB);
   return serveFile(ctx, 'occasions');
 }
+/* P5b: the saints' praises in full (published with the saints registry); read when a day's praise is opened */
+export const breadFilePraises = ctx => serveFile(ctx, 'praises');
 export async function breadFileFeasts(ctx) {
   const { month } = ctx.params;
   if (!/^20\d\d-(0[1-9]|1[0-2])$/.test(String(month))) throw new ApiError('not_found', 'bread');

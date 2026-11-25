@@ -11,6 +11,8 @@ import { LABELS } from '../../worker/src/bread/saints-admin.js';
 const REGISTRY = JSON.parse(readFileSync(new URL('../../daily-bread/saints/registry.json', import.meta.url), 'utf8'));
 // P5: the occasions 0037 adds (the diocese in its P5 form, then the 15 new ones), as D1 has them after the migrations
 const SEED = JSON.parse(readFileSync(new URL('../../daily-bread/saints/occasions-seed.json', import.meta.url), 'utf8'));
+// P5b: the praises as 0038 seeds them (candidates, and the four the owner named)
+const PRAISES = JSON.parse(readFileSync(new URL('../../daily-bread/saints/praises-seed.json', import.meta.url), 'utf8')).praises;
 
 export const WORKER_URL = 'https://athanasios-api.menazak-lab.workers.dev';
 const TOPICS_PER_CALL = 20;
@@ -41,7 +43,7 @@ export function createBreadWorker({ origin, today = cairoDay(), admin = 'admin@t
     // P3: the draft (like D1 saints_items, seeded from P2), the publishes, the published file
     saints: {
       items: [
-        ...REGISTRY.people.map((p, i) => ({ kind: 'person', id: p.id, ord: i + 1, data: withStatus(p), rev: 1, pub_rev: null, deleted: false, at: 0, by: 'P2 import' })),
+        ...REGISTRY.people.map((p, i) => ({ kind: 'person', id: p.id, ord: i + 1, data: withStatus(PRAISES[p.id] ? { ...p, praises: JSON.parse(JSON.stringify(PRAISES[p.id])) } : p), rev: 1, pub_rev: null, deleted: false, at: 0, by: 'P2 import' })),
         ...SEED.occasions.map((o, i) => ({ kind: 'occasion', id: o.id, ord: i + 1, data: o, rev: 1, pub_rev: null, deleted: false, at: 0, by: 'P5 seed' }))
       ],
       snapshots: [], file: null

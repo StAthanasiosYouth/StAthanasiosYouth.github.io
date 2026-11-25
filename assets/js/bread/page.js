@@ -17,9 +17,9 @@ import { playIntro, logoSvg } from './intro.js';
 import { stripTashkeel, agpeyaPsalm } from './text.js';
 import { parseRef, taklaUrl } from './refs.js';
 import { AR, cairoDay, programsOn, dayOf, dateText, clock, bareName, mmss, newSeed, SEED, dayDiff, feastOn, TAKLA_URL as TAKLA } from './model.js';
-import { loadIndex, loadDay, loadFeasts, loadOccasions, beacon, session, me, reflect, reflectEdit, reflectDelete, saveLook } from './api.js';
-import { occasionsOnDay, feastHidden, nextDate, cleanOccasions } from './occasions.js';
-import { occasionCard, churchScreen, praiseSheet, viewerHtml, paintFrames } from './occasions-view.js';
+import { loadIndex, loadDay, loadFeasts, loadOccasions, loadPraises, beacon, session, me, reflect, reflectEdit, reflectDelete, saveLook } from './api.js';
+import { occasionsOnDay, feastHidden, nextDate, cleanOccasions, praiseOf } from './occasions.js';
+import { occasionCard, churchScreen, praiseSheet, viewerHtml, paintFrames, PRAISE_TYPE } from './occasions-view.js';
 import { readFace, RETURN_KEY, FROM_KEY } from '../account/link.js';
 import { soundEnabled, setSoundEnabled } from '../sound.js';
 
@@ -203,7 +203,7 @@ function feast() {
   // the saint's own praise (tamgeed / madih) from the registry, always with its source (owner, 2026-11-19)
   const lines = f.praiseText ? f.praiseText.split('\n').map(l => l.trim()).filter(Boolean) : [];
   const praise = lines.length
-    ? `<blockquote class="br-feast__praise"><p class="br-feast__praise-title">${esc(f.praiseTitle || 'من التمجيد')}</p><p class="br-feast__praise-text">${lines.map(esc).join('<br>')}</p><p class="br-med__by"><a href="${esc(f.praise)}" target="_blank" rel="noopener">التمجيد كامل</a></p></blockquote>`
+    ? `<blockquote class="br-feast__praise"><p class="br-feast__praise-title">${esc(f.praiseTitle || 'من التمجيد')}</p><p class="br-feast__praise-text">${lines.map(esc).join('<br>')}</p><p class="br-med__by">${f.praiseId ? `<button class="oc__praise-go br-feast__praise-go" type="button" data-feast-praise>${bi('reading')}اقرا التمجيد كامل</button>` : `<a href="${esc(f.praise)}" target="_blank" rel="noopener">التمجيد كامل</a>`}</p></blockquote>`
     : '';
   const praiseLink = !lines.length && f.praise ? ` · <a href="${esc(f.praise)}" target="_blank" rel="noopener">التمجيد</a>` : '';
   const src = TAKLA.test(f.url) ? 'سنكسار موقع الأنبا تكلا' : 'المصدر';
@@ -346,6 +346,20 @@ function openPraise(id) {
   d.setAttribute('aria-labelledby', 'pr-title');
   d.addEventListener('click', e => {
     const z = e.target.closest('.pr__btn[data-size]');   // not <html data-size>
+    if (z) { setSize(+z.dataset.size); return; }
+    if (e.target === d || e.target.closest('[data-pr-close]')) d.close();
+  });
+}
+/* P5b: the day's praise in full, on our own page (praises.json, read now) — its source page if that can't load */
+async function openFeastPraise() {
+  const f = S.feast;
+  if (!f || !f.praiseId) return;
+  const q = praiseOf(await loadPraises(), f.person, f.praiseId);
+  if (!q) { window.open(f.praise, '_blank', 'noopener'); return; }
+  const d = dialog('pr', q.title, praiseSheet({ name: f.name, img: f.img, kicker: [PRAISE_TYPE[q.type] || 'تمجيد', q.context].filter(Boolean).join(' · '), praise: q }));
+  d.setAttribute('aria-labelledby', 'pr-title');
+  d.addEventListener('click', e => {
+    const z = e.target.closest('.pr__btn[data-size]');
     if (z) { setSize(+z.dataset.size); return; }
     if (e.target === d || e.target.closest('[data-pr-close]')) d.close();
   });
@@ -671,6 +685,7 @@ app.addEventListener('click', e => {
   if (v) { const card = v.closest('.oc'); openViewer(card ? card.dataset.occasion : '', +v.dataset.view); return; }
   const pr = e.target.closest('[data-praise]');
   if (pr) { openPraise(pr.dataset.praise); return; }
+  if (e.target.closest('[data-feast-praise]')) { openFeastPraise(); return; }
   const op = e.target.closest('[data-open]');
   if (op) { openOccasion(op.dataset.open, op.dataset.at); return; }
   if (e.target.matches('.br-add__time')) { try { e.target.showPicker(); } catch { /* the field itself still works */ } return; }

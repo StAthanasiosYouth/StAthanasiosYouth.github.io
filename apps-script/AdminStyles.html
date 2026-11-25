@@ -16667,6 +16667,15 @@ html[data-mode="light"] .gdoc__crumb { color: var(--acc-deep); }
 .sa-live small { flex-basis: 100%; color: var(--text-3); }
 .sa-live svg { width: 15px; height: 15px; }
 .sa-check { display: flex; gap: 8px; align-items: center; font-size: .9rem; }
+/* P5b: the praises card */
+.sa-prs { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.sa-pr { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--line, rgb(0 0 0 / .08)); border-radius: 12px; }
+.sa-pr.is-ok { border-color: rgb(var(--ok-rgb, 46 160 67) / .35); background: rgb(var(--ok-rgb, 46 160 67) / .04); }
+.sa-pr__main { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.sa-pr__tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.sa-pr__when { color: var(--muted, #666); }
+.sa-pr-old { margin-top: 10px; display: grid; gap: 6px; }
+.sa-checks { display: flex; flex-wrap: wrap; gap: 6px 14px; }
 .sa-picker { display: flex; gap: 10px; align-items: center; }
 .sa-picker .p8-search { flex: 1; }
 .sa-pickgrid { grid-template-columns: repeat(4, minmax(0, 1fr)); max-height: 260px; overflow: auto; }

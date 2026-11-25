@@ -32,7 +32,7 @@ test.before(async () => {
   for (const [month, list] of [
     ['2026-12', [feast('2026-12-04', 'الشهيد العظيم أبي سيفين (فيلوباتير مرقوريوس)', 'mercurius', 'استشهاده', 'كلمة السنكسار عن أبي سيفين.')]],
     ['2027-06', [feast('2027-06-14', 'الشهيد أباسخيرون القليني', 'abaskhiron', 'استشهاده', 'كلمة عن أباسخيرون.')]],
-    ['2027-05', [feast('2027-05-10', 'القديس البابا كيرلس السادس', 'cyril6', 'عيد جلوسه', 'كلمة عن البابا كيرلس.'), feast('2027-05-15', 'القديس البابا أثناسيوس الرسولي', 'athanasius', 'نياحته', 'كلمة السنكسار عن البابا أثناسيوس.')]]
+    ['2027-05', [{ ...feast('2027-05-01', 'الشهيد العظيم مار جرجس', 'george', 'استشهاده', 'في مثل هذا اليوم، الموافق ٢٣ برموده، كلام اليوم عن مار جرجس.'), praise: 'https://tasbeha.org/hymn_library/view/153', praiseTitle: 'السلام لك يا جاورجيوس ذو الاسم العظيم', praiseText: 'السلام لك يا جاورجيوس', praiseId: 'pr1' }, feast('2027-05-10', 'القديس البابا كيرلس السادس', 'cyril6', 'عيد جلوسه', 'كلمة عن البابا كيرلس.'), feast('2027-05-15', 'القديس البابا أثناسيوس الرسولي', 'athanasius', 'نياحته', 'كلمة السنكسار عن البابا أثناسيوس.')]]
   ]) assert.equal((await w.admin('POST', 'bread/feasts', { month, feasts: list })).status, 200);
   browser = await puppeteer.launch({ executablePath: CHROME, headless: true });
 });
@@ -170,6 +170,24 @@ test('a reposed pope in «نحب نفكّرك»: «من بطاركة كنيست�
   ({ page, ctx, errors } = await open('2026-11-18', { width: 1440, height: 900 }));
   await page.waitForSelector('.oc--pope');
   assert.match(await text(page, '.oc__badge'), /قداسة البابا/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('P5b: a saint\'s day praise opens in full on our own page (praises.json, read only then); its words are the day\'s own', async () => {
+  const { page, ctx, errors } = await open('2027-05-01');
+  await page.waitForSelector('.br-feast');
+  assert.match(await text(page, '.br-feast'), /كلام اليوم عن مار جرجس/);
+  const asked = [];
+  page.on('request', r => { if (/praises/.test(r.url())) asked.push(r.url()); });
+  await page.click('[data-feast-praise]');
+  await page.waitForSelector('dialog.pr[open] .pr__st');
+  assert.ok(asked.length >= 1, 'read when pressed');
+  assert.match(await text(page, 'dialog.pr .pr__title'), /جاورجيوس/);
+  assert.match(await text(page, 'dialog.pr .pr__kicker'), /تمجيد/);
+  assert.ok((await page.$$('dialog.pr .pr__st')).length >= 10);
+  await page.click('dialog.pr .pr__done');
+  await page.waitForFunction(() => !document.querySelector('dialog.pr'));
   assert.deepEqual(errors, []);
   await ctx.close();
 });

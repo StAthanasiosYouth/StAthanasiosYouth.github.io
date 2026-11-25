@@ -377,3 +377,41 @@ test('owner 2026-11-25: a dialog stays open on an outside click and says what is
   assert.deepEqual(d.problems, []);
   await d.context.close();
 });
+
+test('P5b «التماجيد والمدائح»: several per person, «مؤكد» and «مرشح», the main one; a confirmed one needs its text; a day keeps its words', async () => {
+  freshWorker();
+  const d = await open();
+  await go(d.page, 'breadpeople');
+  await d.page.waitForSelector('[data-saint="george"]', { timeout: 8000 });
+  await d.page.click('[data-saint="george"]');
+  await d.page.waitForSelector('.sa-prs', { timeout: 6000 });
+  const rows = await d.page.$$eval('.sa-pr', n => n.map(x => x.textContent));
+  assert.ok(rows.some(t => /جاورجيوس/.test(t) && /مؤكد/.test(t) && /الأساسي/.test(t)), rows.join(' | '));
+  await shot(d.page, '30-praises-d');
+  // a new one: confirmed with no text → the dialog stays and says so; as a candidate it saves
+  await d.page.click('[data-act="saints-addpraise"]');
+  await d.page.waitForSelector('dialog [data-field="verses"]');
+  await d.page.type('dialog [data-field="title"]', 'ذكصولوجية مار جرجس');
+  await d.page.type('dialog [data-field="source"]', 'https://example.org/doxa');
+  await d.page.evaluate(() => { const segs = document.querySelectorAll('dialog .seg'); segs[0].querySelectorAll('input')[3].click(); segs[1].querySelectorAll('input')[1].click(); });
+  await d.page.evaluate(() => [...document.querySelectorAll('dialog .modal__actions .btn')].pop().click());
+  await d.page.waitForSelector('dialog .modal__error', { timeout: 4000 });
+  assert.match(await d.page.$eval('dialog .modal__error', n => n.textContent), /النص/);
+  await d.page.type('dialog [data-field="verses"]', 'السطر الأول\nالسطر التاني\n\nالمقطع التاني');
+  await d.page.evaluate(() => { document.querySelectorAll('dialog .sa-checks input')[1].click(); });
+  await d.page.evaluate(() => [...document.querySelectorAll('dialog .modal__actions .btn')].pop().click());
+  await d.page.waitForFunction(() => document.querySelectorAll('.sa-pr').length > 0 && !document.querySelector('dialog[open] [data-field="verses"]'), { timeout: 5000 });
+  await d.page.click('[data-act="saints-save"]');
+  await sleep(700);
+  const g = fake.state.saints.items.find(r => r.id === 'george').data;
+  const q = g.praises.find(x => x.title === 'ذكصولوجية مار جرجس');
+  assert.deepEqual([q.type, q.status, q.verses], ['doxology', 'confirmed', [['السطر الأول', 'السطر التاني'], ['المقطع التاني']]]);
+  assert.deepEqual(q.days, [g.feasts[1].kind]);
+  assert.ok(g.praises.some(x => x.main && /جاورجيوس/.test(x.title)), 'the main one stays');
+  // a day's «نحب نفكّرك» words: shown in its dialog, and kept on save
+  g.feasts[1].word = 'كلام اليوم';
+  await d.page.evaluate(() => document.querySelector('[data-act="saints-day"]').click());
+  await d.page.waitForSelector('dialog [data-field="word"]');
+  assert.deepEqual(d.problems, []);
+  await d.context.close();
+});

@@ -101,7 +101,8 @@ test('occasions.json: resolved days, names, pictures from the albums, what each 
   reg.people = reg.people.map(p => (p.id === 'mercurius' ? { ...p, praise: SEED.praises.mercurius } : p));
   const f = occasionsFile(reg);
   assert.equal(f.schema, 1);
-  assert.equal(f.occasions.length, 16);
+  // the seed's 16, plus any automatic one the live registry has since (a newly published person)
+  assert.equal(f.occasions.filter(o => SEED.occasions.some(x => x.id === o.id)).length, 16);
   const red = f.occasions.find(o => o.id === 'redseadiocese');
   assert.deepEqual([red.gregorian, red.year, red.who], ['06-14', 1992, 'مثلث الرحمات الأنبا ثاؤفيلس أول أسقف للبحر الأحمر']);
   assert.deepEqual(red.hides, [['theophilus', 'تذكار رسامته', 'الأنبا ثاؤفيلس أول أسقف للبحر الأحمر']]);
