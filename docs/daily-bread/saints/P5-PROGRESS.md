@@ -159,3 +159,28 @@
   - `BREAD_OCCASIONS=0`: الكارت والتبويب بيختفوا على طول.
   - `npx wrangler rollback <اللي قبل>`، و`git revert` للـcommits.
   - الـmigration إضافة بس.
+
+## Production (2026-11-25، بموافقة صاحب المشروع «أيوه، نزّل»)
+
+- **Migration `0037`** على `athanasios-prod` ✅: الـ١٦ مناسبة، والإيبارشية بقت `diocese`، وتمجيد أبي سيفين ٣٥ مقطع، و`BREAD_OCCASIONS=0`.
+- **`main`:** `bc0e725` (fast-forward من `1b866f8`).
+- **الـCI:** الاختبارات ← Staging ← Production.
+- **الـWorker على Production:** `1ebe1df0-3f6b-4e60-8662-99202cded787`.
+- **اتأكدت بعد النشر:**
+  - `/v1/health` ‏٢٠٠.
+  - `/v1/bread/file/occasions` بيرد `disabled`، لأن المفتاح مقفول.
+  - الموقع فيه `occasions.js` و`occasions-view.js` و`coptic.js` وطبقة P5 في `bread.css`.
+  - الأدمن فيه المفتاح الجديد.
+- **المفاتيح زي ما كانت:** `BREAD_SAINTS=1`، `BREAD_MODULE=0`، `BREAD_PUSH=0`، `BREAD_OCCASIONS=0`، `NOTIFY_ROUTER=1`، `PERMS_ENFORCE=1`، `CONTENT_DRAFTS=1`. مفيش Push.
+- **الرجوع:**
+  1. المفتاح `BREAD_OCCASIONS=0` (هو كده دلوقتي).
+  2. `npx wrangler rollback 1cc5a8c5-2ed7-4220-be2c-3c03a360dd47`.
+  3. `git revert` للـcommits من `1b866f8` لـ`bc0e725` على `main`.
+  4. الـmigration بتفضل، لأنها إضافة بس. والتعديلين اللي عملتهم في المسودة (الإيبارشية وتمجيد أبي سيفين) بيترجعوا بـ«رجّع» في المراجعة لو لازم.
+- **فاضل على صاحب المشروع من الأدمن:**
+  1. «المناسبات»: يراجع الكلام والصور.
+  2. «راجع وانشر» للسجل. ده بينشر `occasions.json` مع `saints.json`.
+  3. لما يقرر: «الإعدادات» ← «مناسبات كنيستنا على الموقع».
+  4. «الأعياد»: لما الشهر يتنشر تاني، الملف بيبقى فيه `person` و`kind`.
+- **محتاج متابعة:** الـCPU بتاع «راجع وانشر» أول مرة على Production، لأنه بقى بيكتب ملفين.
+- **P5 خلصت من ناحية الكود.**
