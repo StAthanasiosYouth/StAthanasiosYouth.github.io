@@ -176,3 +176,59 @@ html[data-look="dawn"] .oc:not(.oc--patron) .oc-arch { background: #f1e2c4; }
 /* the patron card keeps its own light text in both looks */
 .oc--patron .oc__who { color: #fff3d6; }
 .oc--patron .oc__src { color: #e9cfae; }
+
+/* ======================================================================================================
+ * The full praise on our own page (owner 2026-11-25: «التمجيد يكون في صفحتنا احنا بشكل شيك و حلو»).
+ * One reader for every praise: P5 opens it from the patron's card; later the same reader serves «نحب نفكّرك».
+ *   .pr        a full-screen reading sheet (<dialog>): the maroon head, then the parchment (the reading paper's look)
+ *   .pr__st    one stanza (4 lines), numbered; its last line, the qafla, in maroon
+ * The text size follows the page's own setting (html[data-size] → --br-read-size), with «أ / أ» here too.
+ * ====================================================================================================== */
+.pr { width: min(100vw, 860px); max-width: 100vw; height: min(100dvh, 980px); max-height: 100dvh; margin: auto; padding: 0; border: 0; border-radius: 24px; overflow: hidden; color: var(--br-ink); background: var(--br-paper); box-shadow: 0 40px 100px -30px rgba(0, 0, 0, .95); }
+.pr[open] { display: flex; flex-direction: column; }
+.pr::backdrop { background: rgba(2, 9, 20, .82); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.pr__head {
+  position: relative; flex: none; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 16px; align-items: center;
+  padding: 18px 22px 16px; color: #fff3d6;
+  background: linear-gradient(90deg, transparent, rgba(var(--gold-hi-rgb), .7), transparent) bottom / 80% 1px no-repeat,
+    radial-gradient(120% 160% at 100% 0%, rgba(140, 40, 46, 1) 0%, rgba(92, 22, 30, 1) 50%, rgba(40, 10, 18, 1) 100%);
+}
+.pr__face { width: 62px; aspect-ratio: 4 / 5; border-radius: 999px 999px 12px 12px; overflow: hidden; border: 2px solid var(--gold-hi); box-shadow: 0 0 0 4px rgba(var(--gold-hi-rgb), .14), 0 0 26px rgba(255, 200, 120, .25); }
+.pr__face img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pr__kicker { font-size: .8rem; font-weight: 800; color: #ffe3a6; }
+.pr__title { font-family: var(--font-display); font-weight: 400; font-size: 1.6rem; line-height: 1.35; color: #ffe9b8; margin: 2px 0; }
+.pr__meta { font-size: .8rem; color: #e9cfae; }
+.pr__tools { display: flex; gap: 6px; align-self: start; }
+.pr__btn { display: inline-grid; place-items: center; min-width: 40px; height: 40px; padding: 0 10px; border-radius: 12px; border: 1px solid rgba(var(--gold-hi-rgb), .35); background: rgba(0, 0, 0, .18); color: #ffe9b8; font: inherit; font-weight: 800; cursor: pointer; }
+.pr__btn .icon { width: 18px; height: 18px; }
+.pr__btn--sm { font-size: .8rem; } .pr__btn--lg { font-size: 1.1rem; }
+.pr__body {
+  flex: 1; overflow: auto; overscroll-behavior: contain; padding: 26px clamp(18px, 6vw, 64px) 34px;
+  background: radial-gradient(120% 50% at 50% 0%, rgba(255, 255, 255, .55), rgba(255, 255, 255, 0) 60%), linear-gradient(180deg, var(--br-paper) 0%, var(--br-paper-2) 100%);
+  scrollbar-color: rgba(110, 31, 36, .35) transparent;
+}
+.pr__open { text-align: center; font-size: .86rem; color: var(--br-ink-2); margin-bottom: 18px; }
+.pr__list { list-style: none; margin: 0 auto; padding: 0; max-width: 560px; counter-reset: st; }
+.pr__st { position: relative; padding: 14px 0 16px; text-align: center; font-family: var(--br-amiri); font-size: var(--br-read-size); line-height: 1.95; counter-increment: st; }
+.pr__st + .pr__st { border-top: 1px solid var(--br-paper-line); }
+.pr__st::before { content: counter(st, arabic-indic); position: absolute; inset-inline-start: -34px; top: 18px; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 99px; font-family: var(--font-ui, inherit); font-size: .7rem; font-weight: 800; color: var(--br-maroon); background: rgba(110, 31, 36, .07); border: 1px solid rgba(110, 31, 36, .16); }
+.pr__st span { display: block; }
+.pr__st span:last-child { color: var(--br-maroon); }
+.pr__st--mark { background: linear-gradient(90deg, transparent, rgba(242, 196, 122, .28), transparent); border-radius: 14px; }
+.pr__end { margin: 22px auto 0; max-width: 560px; padding-top: 16px; border-top: 1px solid var(--br-paper-line); display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; font-size: .84rem; color: var(--br-ink-2); }
+.pr__end a { color: var(--br-maroon); text-decoration: underline; text-decoration-color: rgba(110, 31, 36, .4); text-underline-offset: 3px; }
+.pr__done { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 18px; border-radius: 99px; border: 0; font: inherit; font-weight: 800; color: #fff3d6; background: var(--br-maroon); cursor: pointer; }
+.pr__done .icon { width: 17px; height: 17px; }
+/* the card: the praise's first stanza about the saint, then «اقرا التمجيد كامل» */
+.oc__praise-go { display: inline-flex; align-items: center; gap: 8px; margin-top: 10px; min-height: 40px; padding: 0 16px; border-radius: 99px; border: 1px solid rgba(var(--gold-hi-rgb), .5); font: inherit; font-weight: 800; font-size: .88rem; color: #2a0b0f; background: linear-gradient(180deg, #ffe9b8, var(--gold)); cursor: pointer; }
+.oc__praise-go .icon { width: 16px; height: 16px; }
+.oc__praise-go small { font-weight: 700; opacity: .75; }
+@media (max-width: 640px) {
+  .pr { width: 100vw; height: 100dvh; border-radius: 0; }
+  .pr__head { grid-template-columns: auto minmax(0, 1fr); padding: calc(12px + env(safe-area-inset-top)) 14px 12px; gap: 12px; }
+  .pr__tools { grid-column: 1 / -1; justify-content: flex-end; order: -1; margin-bottom: -6px; }
+  .pr__face { width: 50px; }
+  .pr__title { font-size: 1.25rem; }
+  .pr__body { padding: 18px 16px 28px; }
+  .pr__st::before { position: static; margin: 0 auto 6px; }
+}

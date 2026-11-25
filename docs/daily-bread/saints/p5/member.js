@@ -25,7 +25,7 @@ const WD = ['الأحد', 'الاتنين', 'التلات', 'الأربع', 'ا�
 const TODAY = '2026-11-24';
 const ROOT = '../../../../';
 
-const [SHELL, REG, OCC] = await Promise.all(['page-shell.json', ROOT + 'daily-bread/data/saints.json', 'occasions.json'].map(u => fetch(u).then(r => r.json())));
+const [SHELL, REG, OCC, PRAISE] = await Promise.all(['page-shell.json', ROOT + 'daily-bread/data/saints.json', 'occasions.json', 'praise-mercurius.json'].map(u => fetch(u).then(r => r.json())));
 const byId = id => REG.people.find(p => p.id === id);
 
 /* ---------- days ---------- */
@@ -108,6 +108,25 @@ function patronDays(o, iso) {
   const p = byId('mercurius');
   return `<div class="oc__days">${p.feasts.map(f => { const at = nextDate(f, iso); const cur = isOn(f, iso); return `<div class="oc__day" ${cur ? 'aria-current="date"' : ''}><b>${esc(f.kind)}</b>${AR(+f.coptic.split('-')[1])} ${MONTHS[+f.coptic.split('-')[0] - 1]} · ${cur ? 'النهارده' : esc(dateText(at).replace(/^\S+ /, ''))}</div>`; }).join('')}</div>`;
 }
+/* the praise in the card: its first stanza about the saint (the first one is to the Virgin), then the full reader */
+function praiseTeaser() {
+  const st = PRAISE.stanzas[1];
+  return `<blockquote class="oc__praise"><p class="oc__praise-title">${esc(PRAISE.title)}</p><p class="oc__praise-text">${st.map(esc).join('<br>')}</p>
+    <button class="oc__praise-go" type="button" data-praise>${bi('reading')}اقرا التمجيد كامل <small>${AR(PRAISE.stanzas.length)} مقطع</small></button></blockquote>`;
+}
+function praiseSheet() {
+  const p = byId(PRAISE.person); const a = (p.album || [])[0];
+  return `<header class="pr__head">
+      <span class="pr__face"><img src="${ROOT + a.media}" alt="" ${a.crop ? `style="object-position:${a.crop.x}% ${a.crop.y}%"` : ''}></span>
+      <div><p class="pr__kicker">شفيع كنيستنا</p><h2 class="pr__title" id="pr-title">${esc(PRAISE.title.replace('أبوسيفين', 'أبي سيفين'))}</h2>
+        <p class="pr__meta">${PRAISE.author ? 'كلمات: ' + esc(PRAISE.author) + ' · ' : ''}${AR(PRAISE.stanzas.length)} مقطع</p></div>
+      <div class="pr__tools"><button class="pr__btn pr__btn--sm" type="button" data-size="-1" aria-label="صغّر الخط">أ</button><button class="pr__btn pr__btn--lg" type="button" data-size="1" aria-label="كبّر الخط">أ</button><button class="pr__btn" type="button" data-pr-close aria-label="اقفل">${si('close')}</button></div>
+    </header>
+    <div class="pr__body">
+      <ol class="pr__list">${PRAISE.stanzas.map((st, i) => `<li class="pr__st${i === 1 ? ' pr__st--mark' : ''}">${st.map(l => `<span>${esc(l)}</span>`).join('')}</li>`).join('')}</ol>
+      <footer class="pr__end"><span>من <a href="${esc(PRAISE.source)}" target="_blank" rel="noopener">موقع الأنبا تكلا</a></span><button class="pr__done" type="button" data-pr-close>${si('check')}ربنا يباركك، ارجع لليوم</button></footer>
+    </div>`;
+}
 function occasionCard(list, iso) {
   if (!list.length) return '';
   const o = list[0];
@@ -123,7 +142,7 @@ function occasionCard(list, iso) {
   const facts = y ? `<span class="oc__fact">${si('calendar')}الذكرى الـ<b>${AR(y)}</b></span>` : '';
   const more = patron ? `<details class="oc__more" ${q.get('open') === '1' ? 'open' : ''}><summary><span class="oc__open">اقرا السنكسار والتمجيد</span><span class="oc__close">اقفل</span>${si('chevron')}</summary>
       <div class="oc__more-body">${PATRON_WORD.map(t => `<p>${esc(t)}</p>`).join('')}
-        ${byId('mercurius').praise ? `<blockquote class="oc__praise"><p class="oc__praise-title">${esc(byId('mercurius').praise.title || 'من التمجيد')}</p><p class="oc__praise-text">${byId('mercurius').praise.text.split('\n').map(esc).join('<br>')}</p><p class="br-med__by"><a href="${esc(byId('mercurius').praise.source)}" target="_blank" rel="noopener">التمجيد كامل</a></p></blockquote>` : ''}
+        ${praiseTeaser()}
         <p class="oc__praise-title" style="margin-top:14px">أعياد شفيع كنيستنا في السنة</p>${patronDays(o, iso)}
       </div></details>` : '';
   return `<section class="oc oc--${o.type}" aria-labelledby="oc-title" data-occasion="${o.id}">
@@ -178,5 +197,20 @@ document.addEventListener('click', e => {
   if (e.target.closest('[data-close]') || e.target === dlg) dlg.close();
 });
 if (q.get('pics') === '1' && PICS.length) show(0);
+
+/* ---------- the full praise ---------- */
+const pr = document.createElement('dialog');
+pr.className = 'pr';
+pr.setAttribute('aria-labelledby', 'pr-title');
+document.body.append(pr);
+const openPraise = () => { pr.innerHTML = praiseSheet(); pr.showModal(); pr.querySelector('.pr__body').scrollTop = 0; };
+document.addEventListener('click', e => {
+  if (e.target.closest('[data-praise]')) openPraise();
+  else if (e.target.closest('[data-pr-close]') || e.target === pr) pr.close();
+  const z = e.target.closest('.pr [data-size]');
+  if (z) html.dataset.size = String(Math.max(1, Math.min(4, (+html.dataset.size || 2) + +z.dataset.size)));
+});
+if (q.get('size')) html.dataset.size = q.get('size');
+if (q.get('praise') === '1') openPraise();
 document.title = `P5 المعاينة — ${list.length ? list[0].headline : 'يوم عادي'} (${day})`;
 html.dataset.ready = '1';

@@ -20,6 +20,8 @@ export const SCREENS = [
   // id, page + query, full page?
   ['01-patron', 'member.html?d=2026-12-04', false],
   ['02-patron-open', 'member.html?d=2026-12-04&open=1', true],
+  ['02c-praise-full', 'member.html?d=2026-12-04&praise=1', false],
+  ['02d-praise-big', 'member.html?d=2026-12-04&praise=1&size=4', false],
   ['03-diocese-and-feast', 'member.html?d=2027-06-14', true],
   ['04-repose-stack', 'member.html?d=2027-02-12', false],
   ['05-pictures', 'member.html?d=2027-02-12&pics=1', false],
