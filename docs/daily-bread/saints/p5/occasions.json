@@ -1,0 +1,120 @@
+{
+ "about": "P5 preview: the proposed «مناسبات كنيستنا» list (the seed for D1 after approval). A day is either the occasion's own (coptic | gregorian + year, or once + date) or `from` = a person's day in the registry (its date and source, never typed twice). `covers` = the people's days this card stands for on that day: they never show again that day (not in «نحب نفكّرك», not as a second card). Pictures: from the people's albums (media library). Texts: our own wording, facts with sources only.",
+ "types": {
+  "patron": "شفيع كنيستنا",
+  "diocese": "إيبارشيتنا وآباؤها الأساقفة",
+  "fathers": "آباء كنيستنا",
+  "church": "تاريخ كنيستنا",
+  "local": "تذكار عندنا"
+ },
+ "occasions": [
+  {
+   "id": "abusefeinmartyrdom", "type": "patron", "from": { "person": "mercurius", "feast": "استشهاده" },
+   "headline": "النهارده عيد استشهاد شفيع كنيستنا",
+   "lead": "كنيستنا في سفاجا على اسمه، وده أكبر أعياده في السنة.",
+   "pictures": [{ "person": "mercurius", "media": "media/2026/img-f6438158.webp" }]
+  },
+  {
+   "id": "abusefeinrelics", "type": "patron", "from": { "person": "mercurius", "feast": "نقل أعضائه" },
+   "headline": "النهارده عيد نقل أعضاء شفيع كنيستنا",
+   "lead": "الكنيسة بتعيّد النهارده بنقل أعضائه المقدسة.",
+   "pictures": [{ "person": "mercurius", "media": "media/2026/img-f6438158.webp" }]
+  },
+  {
+   "id": "abusefeinconsecration", "type": "patron", "from": { "person": "mercurius", "feast": "تكريس كنيسته" },
+   "headline": "النهارده تذكار تكريس كنيسة شفيع كنيستنا",
+   "lead": "السنكسار بيفتكر النهارده تكريس كنيسته، وكنيستنا في سفاجا على اسمه.",
+   "pictures": [{ "person": "mercurius", "media": "media/2026/img-f6438158.webp" }]
+  },
+  {
+   "id": "redseadiocese", "type": "diocese", "gregorian": "06-14", "year": 1992,
+   "covers": [{ "person": "theophilus", "feast": "تذكار رسامته" }],
+   "people": ["theophilus"],
+   "headline": "النهارده عيد إيبارشيتنا",
+   "lead": "في اليوم ده سنة ١٩٩٢ البابا شنودة الثالث رسم الأنبا ثاؤفيلس أول أسقف للبحر الأحمر، وبقت إيبارشيتنا مستقلة بعد ما كانت تبع الأنبا مكاريوس أسقف قنا والبحر الأحمر.",
+   "source": "https://copticorthodox.church/en/past-bishops/bishop-theophilos/",
+   "more": ["https://www.youm7.com/story/2019/2/14/افتح-له-يا-رب-أبواب-الراحة-الكنيسة-تودع-أسقف-البحر/4140630", "https://st-takla.org/Saints/bishops/meem/makarius-quena.html"],
+   "pictures": [
+    { "person": "theophilus", "media": "media/2026/img-c2a60f81.webp" },
+    { "person": "theophilus", "media": "media/2026/img-7e55bbcd.webp", "caption": "تدشين مذبح كنيسة أبي سيفين بسفاجا" },
+    { "person": "theophilus", "media": "media/2026/img-b3b4b741.webp" }
+   ]
+  },
+  {
+   "id": "theophilusrepose", "type": "diocese", "from": { "person": "theophilus", "feast": "نياحته" },
+   "headline": "النهارده ذكرى نياحة أبونا الأسقف الأول",
+   "lead": "خدم إيبارشيتنا من ١٩٩٢ لحد نياحته سنة ٢٠١٩.",
+   "pictures": [
+    { "person": "theophilus", "media": "media/2026/img-cf1afea8.webp" },
+    { "person": "theophilus", "media": "media/2026/img-33ce0d33.webp", "caption": "في كنيسة أبي سيفين بسفاجا" },
+    { "person": "theophilus", "media": "media/2026/img-b5532ecd.webp", "caption": "سيدنا الأنبا ثاؤفيلس ومعاه القمص إبراهيم إسراڤيم في كنيسة أبي سيفين بسفاجا" },
+    { "person": "theophilus", "media": "media/2026/img-e4257483.webp" }
+   ]
+  },
+  {
+   "id": "makariosordination", "type": "diocese", "from": { "person": "makariosqena", "feast": "تذكار رسامته" },
+   "headline": "النهارده تذكار رسامة الأنبا مكاريوس",
+   "lead": "أسقف قنا وقوص وقفط ونقادة ودشنا والبحر الأحمر، اترسم سنة ١٩٦٥، وكانت كنايس البحر الأحمر تبعه لحد نياحته.",
+   "pictures": [{ "person": "makariosqena", "media": "media/2026/img-a0c38fb6.webp" }]
+  },
+  {
+   "id": "makariosrepose", "type": "diocese", "from": { "person": "makariosqena", "feast": "نياحته" },
+   "headline": "النهارده تذكار نياحة الأنبا مكاريوس",
+   "lead": "كان أسقف قنا والبحر الأحمر من ١٩٦٥، واتنيح ٣ فبراير ١٩٩١، وبعده بقت البحر الأحمر إيبارشية مستقلة.",
+   "pictures": [{ "person": "makariosqena", "media": "media/2026/img-a0c38fb6.webp" }]
+  },
+  {
+   "id": "tawadrosenthronement", "type": "diocese", "from": { "person": "tawadros2", "feast": "عيد جلوسه" },
+   "headline": "النهارده عيد جلوس قداسة البابا",
+   "lead": "بابا الإسكندرية وبطريرك الكرازة المرقسية. اتجلّس يوم ١٨ نوفمبر ٢٠١٢. ربنا يحفظ حياته ويثبّته على كرسيه.",
+   "pictures": [{ "person": "tawadros2", "media": "media/2026/img-bc3f23c3.webp" }]
+  },
+  {
+   "id": "ilarionordination", "type": "diocese", "from": { "person": "ilarion", "feast": "عيد رسامته" },
+   "headline": "النهارده عيد رسامة أبونا الأسقف",
+   "lead": "اترسم أسقف يوم ٩ يونيو ٢٠١٩. ربنا يديم خدمته.",
+   "pictures": [{ "person": "ilarion", "media": "media/2026/img-eca07f5d.webp" }]
+  },
+  {
+   "id": "ilarionenthronement", "type": "diocese", "from": { "person": "ilarion", "feast": "عيد تجليسه" },
+   "headline": "النهارده عيد تجليس أبونا الأسقف",
+   "lead": "اتجلّس في الغردقة يوم ٢٧ يوليو ٢٠١٩. ربنا يديم خدمته.",
+   "pictures": [{ "person": "ilarion", "media": "media/2026/img-eca07f5d.webp" }]
+  },
+  {
+   "id": "ibrahimpriest", "type": "fathers", "from": { "person": "ibrahimisravim", "feast": "عيد رسامته قس" },
+   "headline": "النهارده عيد رسامة أبونا",
+   "lead": "كاهن كنيستنا، اترسم قس يوم ٢١ فبراير ١٩٨٨. كل سنة وأبونا طيب، صلّوا علشانه.",
+   "pictures": [{ "person": "ibrahimisravim", "media": "media/2026/img-8a2135da.webp" }]
+  },
+  {
+   "id": "ibrahimhegumen", "type": "fathers", "from": { "person": "ibrahimisravim", "feast": "عيد ترقيته قمص" },
+   "headline": "النهارده عيد ترقية أبونا قمص",
+   "lead": "كاهن كنيستنا، اترقّى قمص يوم ٣٠ أبريل ١٩٩٠. كل سنة وأبونا طيب، صلّوا علشانه.",
+   "pictures": [{ "person": "ibrahimisravim", "media": "media/2026/img-8a2135da.webp" }]
+  },
+  {
+   "id": "isaacpriest", "type": "fathers", "from": { "person": "isaacnabih", "feast": "عيد رسامته" },
+   "headline": "النهارده عيد رسامة أبونا",
+   "lead": "كاهن كنيستنا، اترسم قس يوم ٣١ أغسطس ١٩٩٧. كل سنة وأبونا طيب، صلّوا علشانه.",
+   "pictures": [{ "person": "isaacnabih", "media": "media/2026/img-b40cf5cf.webp" }]
+  },
+  {
+   "id": "ordination2021", "type": "fathers", "gregorian": "03-20", "year": 2021,
+   "covers": [{ "person": "angelosmourad", "feast": "عيد رسامته" }, { "person": "philopaterromany", "feast": "عيد رسامته" }],
+   "people": ["angelosmourad", "philopaterromany"],
+   "headline": "النهارده عيد رسامة أبونا أنجيلوس وأبونا فيلوباتير",
+   "lead": "اترسموا مع بعض يوم ٢٠ مارس ٢٠٢١ على إيد نيافة الأنبا إيلاريون. كل سنة وآباؤنا طيبين، صلّوا علشانهم.",
+   "source": "https://www.youm7.com/story/2021/11/4/x/5521990",
+   "pictures": [
+    { "person": "angelosmourad", "media": "media/2026/img-c5072558.webp" },
+    { "person": "philopaterromany", "media": "media/2026/img-cf1a07c1.webp" }
+   ]
+  }
+ ],
+ "waiting": [
+  { "what": "ترقية القمص إسحاق نبيه قمص", "known": "أغسطس ٢٠١٩ (من صاحب المشروع)", "why": "اليوم مش معروف بمصدر" },
+  { "what": "تدشين مذبح كنيسة أبي سيفين بسفاجا", "known": "صورة من P4 وصورة من فيسبوك ٢٠٢٠", "why": "التاريخ مش مكتوب في أي مصدر" },
+  { "what": "الكنيسة الأولى (خشب) والكنيسة التانية", "known": "تعليقات صفحة فيسبوك (معتمدة)", "why": "من غير سنين: مكانها P7 «حول كنيستنا»" }
+ ]
+}

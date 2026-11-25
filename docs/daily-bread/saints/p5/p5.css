@@ -1,0 +1,178 @@
+/*
+ * «خبزنا اليومي» P5 — «مناسبات كنيستنا» on the member page: the preview layer (→ assets/css/bread.css
+ * «P5 — CHURCH OCCASIONS» in the build). On top of the real main.css + bread.css; the site's tokens only
+ * (--gold, --gold-hi-rgb, --br-maroon, --br-paper, --font-display, --br-amiri, --text…).
+ *
+ *   .oc            the card, at the top of the day (inside the dawn stage, above the date): glass over the sky
+ *   .oc--patron    our patron, Abu Sefein: martyr's maroon, a double gold frame, the arch portrait in gold
+ *   .oc__pics      one arch · two arches side by side (two fathers) · a fanned stack (several pictures) → the viewer
+ *   .oc-view       the pictures viewer (a <dialog>): one picture at a time, its caption, «صورة تعبيرية» if AI/painted
+ */
+
+.oc {
+  --oc-arch-w: 128px;
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+  width: min(100%, 860px);
+  margin: 0 auto 22px;
+  padding: 20px 22px 18px;
+  text-align: start;
+  color: var(--text);
+  border: 1px solid rgba(var(--gold-hi-rgb), .34);
+  border-radius: 22px;
+  background:
+    linear-gradient(90deg, transparent, rgba(var(--gold-hi-rgb), .55), transparent) top / 70% 1px no-repeat,
+    linear-gradient(160deg, rgba(6, 22, 44, .82), rgba(12, 36, 66, .7));
+  box-shadow: 0 22px 60px -26px rgba(0, 0, 0, .7), inset 0 1px 0 rgba(255, 255, 255, .06);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  backdrop-filter: blur(14px) saturate(1.15);
+}
+
+/* the kicker: what this card is, and the day in both calendars */
+.oc__kicker { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 6px; font-size: .84rem; font-weight: 800; color: var(--gold-hi); }
+.oc__kicker .icon { width: 18px; height: 18px; color: var(--gold); }
+.oc__tag { display: inline-flex; align-items: center; gap: 6px; }
+.oc__date { padding: 2px 10px; border-radius: 99px; border: 1px solid rgba(var(--gold-hi-rgb), .26); font-weight: 700; font-size: .78rem; color: var(--text-2); background: rgba(255, 255, 255, .04); }
+.oc__title { font-family: var(--font-display); font-size: 1.7rem; line-height: 1.35; font-weight: 400; color: var(--gold-hi); margin: 2px 0 6px; }
+.oc__who { font-weight: 800; font-size: 1.04rem; line-height: 1.6; color: var(--text); margin-bottom: 4px; }
+.oc__lead { font-size: 1rem; line-height: 1.9; color: var(--text-2); }
+.oc__facts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.oc__fact { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 99px; font-size: .8rem; font-weight: 700; color: var(--text-2); background: rgba(var(--gold-hi-rgb), .08); border: 1px solid rgba(var(--gold-hi-rgb), .16); }
+.oc__fact b { color: var(--gold-hi); font-weight: 800; }
+.oc__src { margin-top: 10px; font-size: .8rem; color: var(--text-3); }
+.oc__src a { color: inherit; text-decoration: underline; text-decoration-color: var(--gold); text-underline-offset: 3px; }
+
+/* ---------- pictures: one arch / two arches / a fanned stack ---------- */
+.oc__pics { position: relative; display: flex; gap: 10px; align-items: flex-end; }
+.oc-arch {
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--oc-arch-w);
+  aspect-ratio: 4 / 5;
+  padding: 0;
+  border: 2px solid rgba(var(--gold-hi-rgb), .7);
+  border-radius: 999px 999px 16px 16px;
+  overflow: hidden;
+  background: #0b2140;
+  box-shadow: 0 0 0 4px rgba(var(--gold-hi-rgb), .1), 0 16px 34px -14px rgba(0, 0, 0, .8);
+  cursor: zoom-in;
+  font: inherit;
+  color: inherit;
+}
+.oc-arch img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.oc-arch__ai { position: absolute; inset-inline: 0; bottom: 6px; margin-inline: auto; width: max-content; max-width: 92%; padding: 1px 8px; border-radius: 99px; font-size: .62rem; font-weight: 700; color: #fff8ea; background: rgba(2, 9, 20, .62); line-height: 1.7; }
+.oc-arch__name { display: block; margin-top: 6px; font-size: .74rem; font-weight: 700; text-align: center; color: var(--text-2); }
+.oc__pics--duo { gap: 10px; }
+.oc__pics--duo figure { margin: 0; width: var(--oc-arch-w); }
+.oc__pics--duo figure + figure { margin-top: 18px; }
+.oc__pics--duo { --oc-arch-w: 104px; }
+
+/* several pictures of the same occasion: a fanned stack, the first in front; «+٣» opens the viewer */
+.oc__pics--stack { width: calc(var(--oc-arch-w) + 44px); justify-content: flex-start; height: calc(var(--oc-arch-w) * 1.25 + 14px); }
+.oc__pics--stack .oc-arch { position: absolute; bottom: 0; inset-inline-start: 0; }
+.oc__pics--stack .oc-arch:nth-child(2) { rotate: -9deg; translate: -34px -8px; filter: brightness(.7); }
+.oc__pics--stack .oc-arch:nth-child(3) { rotate: -4deg; translate: -17px -3px; filter: brightness(.85); }
+.oc__pics--stack .oc-arch:nth-child(1) { z-index: 3; }
+.oc__pics--stack .oc-arch:nth-child(2) { z-index: 2; }
+.oc__pics--stack .oc-arch:nth-child(3) { z-index: 1; }
+.oc__more-pics { position: absolute; z-index: 4; inset-inline-end: -6px; bottom: 10px; display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border: 1px solid rgba(var(--gold-hi-rgb), .5); border-radius: 99px; font: inherit; font-size: .76rem; font-weight: 800; color: #1b1206; background: linear-gradient(180deg, var(--gold-hi), var(--gold)); box-shadow: 0 8px 18px -8px rgba(0, 0, 0, .7); cursor: pointer; }
+.oc__more-pics .icon { width: 15px; height: 15px; }
+
+/* ---------- «اقرا…»: the Synaxarium word, the praise, the patron's days (in place, no new page) ---------- */
+.oc__more { margin-top: 12px; }
+.oc__more > summary { white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 16px; border-radius: 99px; border: 1px solid rgba(var(--gold-hi-rgb), .4); font-weight: 800; font-size: .9rem; color: var(--gold-hi); background: rgba(var(--gold-hi-rgb), .06); cursor: pointer; list-style: none; }
+.oc__more > summary::-webkit-details-marker { display: none; }
+.oc__more > summary .icon { width: 16px; height: 16px; transition: rotate .25s; rotate: 90deg; }
+.oc__more[open] > summary .icon { rotate: -90deg; }
+.oc__more[open] > summary .oc__open { display: none; }
+.oc__more:not([open]) > summary .oc__close { display: none; }
+.oc__more-body { margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(var(--gold-hi-rgb), .16); }
+.oc__more-body p { font-size: 1rem; line-height: 1.95; color: var(--text); }
+.oc__more-body p + p { margin-top: 8px; }
+.oc__praise { margin: 14px 0 4px; padding: 10px 14px; border-inline-start: 3px solid var(--gold); border-radius: 10px; background: rgba(255, 255, 255, .04); }
+.oc__praise-title { font-size: .86rem !important; font-weight: 800; color: var(--gold) !important; margin-bottom: 4px; }
+.oc__praise-text { font-family: var(--br-amiri); font-size: 1.12rem !important; line-height: 2 !important; }
+.oc__days { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+.oc__day { padding: 8px 10px; border-radius: 12px; border: 1px solid rgba(var(--gold-hi-rgb), .16); background: rgba(255, 255, 255, .03); font-size: .8rem; line-height: 1.6; color: var(--text-2); text-align: center; }
+.oc__day b { display: block; font-size: .92rem; color: var(--text); }
+.oc__day[aria-current] { border-color: rgba(var(--gold-hi-rgb), .6); background: rgba(var(--gold-hi-rgb), .1); }
+.oc__day[aria-current] b { color: var(--gold-hi); }
+
+/* ---------- our patron: one distinct card ---------- */
+.oc--patron {
+  --oc-arch-w: 148px;
+  border-color: rgba(var(--gold-hi-rgb), .6);
+  background:
+    linear-gradient(90deg, transparent, rgba(var(--gold-hi-rgb), .8), transparent) top / 80% 1px no-repeat,
+    radial-gradient(120% 150% at 100% 0%, rgba(140, 40, 46, .96) 0%, rgba(92, 22, 30, .95) 46%, rgba(40, 10, 18, .96) 100%);
+  box-shadow: inset 0 0 0 5px rgba(40, 10, 18, .9), inset 0 0 0 6px rgba(var(--gold-hi-rgb), .32), 0 26px 70px -26px rgba(40, 0, 6, .85);
+  padding: 24px 26px 20px;
+}
+.oc--patron .oc__kicker { color: #ffe3a6; }
+.oc--patron .oc__title { color: #ffe9b8; font-size: 1.95rem; }
+.oc--patron .oc__lead, .oc--patron .oc__more-body p, .oc--patron .oc__day { color: #f6e4cc; }
+.oc--patron .oc__date { color: #f6e4cc; border-color: rgba(var(--gold-hi-rgb), .36); }
+.oc--patron .oc-arch { border-color: var(--gold-hi); box-shadow: 0 0 0 5px rgba(var(--gold-hi-rgb), .16), 0 0 36px 4px rgba(255, 200, 120, .28), 0 18px 36px -14px rgba(0, 0, 0, .8); background: #3a0e16; }
+.oc--patron .oc__day { background: rgba(0, 0, 0, .16); }
+.oc__crown { display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px; border-radius: 99px; color: #2a0b0f; background: linear-gradient(180deg, #ffe9b8, var(--gold)); font-weight: 900; font-size: .8rem; }
+.oc__crown .icon { width: 15px; height: 15px; color: #6e1f24 !important; }
+
+/* ---------- the rest page (no reading today): same card, under the rest title ---------- */
+.br-dawn--rest .oc { margin: 26px auto 0; }
+
+/* ---------- the viewer ---------- */
+.oc-view { width: min(94vw, 720px); max-height: 92vh; padding: 0; border: 1px solid rgba(var(--gold-hi-rgb), .3); border-radius: 20px; color: var(--text); background: #06142a; box-shadow: 0 30px 80px -20px rgba(0, 0, 0, .9); }
+.oc-view::backdrop { background: rgba(2, 9, 20, .78); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.oc-view__fig { position: relative; margin: 0; display: flex; align-items: center; justify-content: center; background: #020914; min-height: 220px; }
+.oc-view__fig img { display: block; max-width: 100%; max-height: 70vh; object-fit: contain; }
+.oc-view__ai { position: absolute; bottom: 10px; inset-inline-start: 10px; padding: 2px 10px; border-radius: 99px; font-size: .72rem; font-weight: 700; color: #fff8ea; background: rgba(2, 9, 20, .62); }
+.oc-view__bar { display: flex; align-items: center; gap: 10px; padding: 12px 14px; }
+.oc-view__cap { flex: 1; min-width: 0; font-size: .92rem; line-height: 1.7; color: var(--text-2); }
+.oc-view__n { font-size: .8rem; font-weight: 800; color: var(--gold-hi); }
+.oc-view__btn { display: inline-grid; place-items: center; width: 42px; height: 42px; border-radius: 99px; border: 1px solid rgba(var(--gold-hi-rgb), .3); background: rgba(255, 255, 255, .04); color: var(--gold-hi); cursor: pointer; }
+.oc-view__btn .icon { width: 18px; height: 18px; }
+.oc-view__btn--prev .icon { rotate: 180deg; }
+
+/* ---------- phones ---------- */
+@media (max-width: 640px) {
+  .oc { --oc-arch-w: 92px; gap: 14px; padding: 16px 14px 14px; border-radius: 18px; margin-bottom: 18px; }
+  .oc--patron { --oc-arch-w: 100px; padding: 18px 16px 16px; }
+  .oc__title { font-size: 1.32rem; }
+  .oc--patron .oc__title { font-size: 1.45rem; }
+  .oc__lead { font-size: .94rem; line-height: 1.8; }
+  .oc__pics--duo { --oc-arch-w: 74px; }
+  .oc__pics--duo figure + figure { margin-top: 12px; }
+  .oc-arch__name { font-size: .68rem; line-height: 1.4; }
+  .oc__pics--stack { width: calc(var(--oc-arch-w) + 30px); }
+  .oc__pics--stack .oc-arch:nth-child(2) { translate: -24px -6px; }
+  .oc__pics--stack .oc-arch:nth-child(3) { translate: -12px -3px; }
+  .oc { grid-template-columns: auto minmax(0, 1fr); row-gap: 4px; }
+  .oc__body { display: contents; }
+  .oc__pics { grid-row: 1; grid-column: 1; }
+  .oc__kicker { grid-row: 1; grid-column: 2; align-self: center; flex-direction: column; align-items: flex-start; gap: 8px; margin: 0; }
+  .oc__body > :not(.oc__kicker) { grid-column: 1 / -1; }
+  .oc__title { margin-top: 10px; }
+  .oc__days { grid-template-columns: 1fr; }
+  .oc__day { display: flex; justify-content: space-between; gap: 8px; text-align: start; }
+  .oc__day b { display: inline; }
+}
+
+/* ---------- the dawn look (light) ---------- */
+html[data-look="dawn"] .oc:not(.oc--patron) { color: var(--br-ink); border-color: rgba(110, 31, 36, .2); background: linear-gradient(90deg, transparent, rgba(110, 31, 36, .35), transparent) top / 70% 1px no-repeat, linear-gradient(160deg, rgba(255, 250, 238, .9), rgba(251, 240, 220, .82)); box-shadow: 0 22px 50px -28px rgba(110, 70, 20, .55); }
+html[data-look="dawn"] .oc:not(.oc--patron) .oc__title, html[data-look="dawn"] .oc:not(.oc--patron) .oc__kicker { color: var(--br-maroon); }
+html[data-look="dawn"] .oc:not(.oc--patron) .oc__kicker .icon { color: #b0702a; }
+html[data-look="dawn"] .oc:not(.oc--patron) .oc__lead, html[data-look="dawn"] .oc:not(.oc--patron) .oc__date, html[data-look="dawn"] .oc:not(.oc--patron) .oc__fact, html[data-look="dawn"] .oc:not(.oc--patron) .oc-arch__name { color: var(--br-ink-2); }
+html[data-look="dawn"] .oc:not(.oc--patron) .oc__who { color: var(--br-ink); }
+html[data-look="dawn"] .oc:not(.oc--patron) .oc__fact b { color: var(--br-maroon); }
+html[data-look="dawn"] .oc:not(.oc--patron) .oc__fact, html[data-look="dawn"] .oc:not(.oc--patron) .oc__date { background: rgba(110, 31, 36, .05); border-color: rgba(110, 31, 36, .16); }
+html[data-look="dawn"] .oc:not(.oc--patron) .oc-arch { background: #f1e2c4; }
+
+@media (prefers-reduced-motion: reduce) { .oc__more > summary .icon { transition: none; } }
+
+/* the patron card keeps its own light text in both looks */
+.oc--patron .oc__who { color: #fff3d6; }
+.oc--patron .oc__src { color: #e9cfae; }
