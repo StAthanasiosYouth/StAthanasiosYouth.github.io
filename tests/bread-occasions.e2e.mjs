@@ -174,22 +174,16 @@ test('a reposed pope in «نحب نفكّرك»: «من بطاركة كنيست�
   await ctx.close();
 });
 
-test('P5b: a saint\'s day praise opens in full on our own page (praises.json, read only then); its words are the day\'s own', async () => {
+test('P5b: a saint\'s day praise shows whole in «نحب نفكّرك» (owner: no button), from praises.json; the words are the day\'s own', async () => {
   const { page, ctx, errors } = await open('2027-05-01');
   await page.waitForSelector('.br-feast');
   assert.match(await text(page, '.br-feast'), /كلام اليوم عن مار جرجس/);
-  if (process.env.SAINTS_SHOTS) { await page.$eval('.br-feast', n => n.scrollIntoView()); await sleep(400); await page.screenshot({ path: '../docs/daily-bread/saints/p5/shots/p5b-feast-card-m.png' }); }
-  const asked = [];
-  page.on('request', r => { if (/praises/.test(r.url())) asked.push(r.url()); });
-  await page.click('[data-feast-praise]');
-  await page.waitForSelector('dialog.pr[open] .pr__st');
-  assert.ok(asked.length >= 1, 'read when pressed');
-  if (process.env.SAINTS_SHOTS) { await sleep(600); await page.screenshot({ path: '../docs/daily-bread/saints/p5/shots/p5b-praise-sheet-m.png' }); }
-  assert.match(await text(page, 'dialog.pr .pr__title'), /جاورجيوس/);
-  assert.match(await text(page, 'dialog.pr .pr__kicker'), /تمجيد/);
-  assert.ok((await page.$$('dialog.pr .pr__st')).length >= 10);
-  await page.click('dialog.pr .pr__done');
-  await page.waitForFunction(() => !document.querySelector('dialog.pr'));
+  await page.waitForSelector('.br-feast .br-feast__praise--full .br-feast__st', { timeout: 10000 });
+  assert.ok((await page.$$('.br-feast .br-feast__st')).length >= 10, 'every stanza');
+  assert.match(await text(page, '.br-feast .br-feast__praise-title'), /جاورجيوس.*تمجيد/);
+  assert.equal(await page.$('[data-feast-praise]'), null, 'no button');
+  assert.equal(await noScroll(page), 0);
+  if (process.env.SAINTS_SHOTS) { await page.$eval('.br-feast', n => n.scrollIntoView()); await sleep(400); await page.screenshot({ path: '../docs/daily-bread/saints/p5/shots/p5b-feast-card-m.png', fullPage: true }); }
   assert.deepEqual(errors, []);
   await ctx.close();
 });

@@ -839,6 +839,11 @@ html[data-motion="lite"].br-arrive * { filter: none !important; }
 .br-feast__praise { margin: 12px 0 4px; padding: 10px 14px; border-inline-start: 3px solid var(--gold); border-radius: 10px; background: rgb(255 255 255 / .04); }
 .br-feast .br-feast__praise-title { font-size: .86rem; font-weight: 700; color: var(--gold); margin-bottom: 4px; }
 .br-feast .br-feast__praise-text { font-size: 1rem; line-height: 2; }
+/* P5b: the whole praise in the card (owner 2026-11-25) */
+.br-feast .br-feast__praise-title small { display: block; font-size: .74rem; font-weight: 600; opacity: .75; }
+.br-feast .br-feast__st { margin: 0; padding: 10px 0; font-size: 1rem; line-height: 2; text-align: center; }
+.br-feast .br-feast__st + .br-feast__st { border-top: 1px solid rgb(255 255 255 / .08); }
+.br-feast .br-feast__ref { color: var(--gold); }
 .br-feast p:not(.br-feast__name):not(.br-feast__title):not(.br-med__by) { font-size: 1rem; line-height: 1.9; }
 
 /* ======================================================================================================

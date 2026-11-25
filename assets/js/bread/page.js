@@ -201,11 +201,8 @@ function feast() {
   // one picture, lazy; an AI or painted one carries a small «صورة تعبيرية» (P4, owner 2026-11-24). Never a photographer's name.
   const pic = f.img ? `<figure class="br-feast__fig"><span class="br-feast__pic"><img class="br-feast__img" src="${esc(f.img)}" alt="${esc(f.name)}" loading="lazy" decoding="async" referrerpolicy="no-referrer">${f.imgAi ? '<span class="br-feast__ai">صورة تعبيرية</span>' : ''}</span></figure>` : '';
   // the saint's own praise (tamgeed / madih) from the registry, always with its source (owner, 2026-11-19)
-  const lines = f.praiseText ? f.praiseText.split('\n').map(l => l.trim()).filter(Boolean) : [];
-  const praise = lines.length
-    ? `<blockquote class="br-feast__praise"><p class="br-feast__praise-title">${esc(f.praiseTitle || 'من التمجيد')}</p><p class="br-feast__praise-text">${lines.map(esc).join('<br>')}</p><p class="br-med__by">${f.praiseId ? `<button class="oc__praise-go br-feast__praise-go" type="button" data-feast-praise>${bi('reading')}اقرا التمجيد كامل</button>` : `<a href="${esc(f.praise)}" target="_blank" rel="noopener">التمجيد كامل</a>`}</p></blockquote>`
-    : '';
-  const praiseLink = !lines.length && f.praise ? ` · <a href="${esc(f.praise)}" target="_blank" rel="noopener">التمجيد</a>` : '';
+  const praise = feastPraise(f);
+  const praiseLink = !praise && f.praise ? ` · <a href="${esc(f.praise)}" target="_blank" rel="noopener">التمجيد</a>` : '';
   const src = TAKLA.test(f.url) ? 'سنكسار موقع الأنبا تكلا' : 'المصدر';
   // P5 (owner 2026-11-25): the reposed popes keep a papal touch here
   const pope = /^(القديس )?البابا /.test(f.name);
@@ -350,19 +347,29 @@ function openPraise(id) {
     if (e.target === d || e.target.closest('[data-pr-close]')) d.close();
   });
 }
-/* P5b: the day's praise in full, on our own page (praises.json, read now) — its source page if that can't load */
-async function openFeastPraise() {
+/*
+ * P5b (owner 2026-11-25): the day's praise — تمجيد، مديح، تسبحة… — shown whole inside «نحب نفكّرك», no button.
+ * Its text is in praises.json, read right after the page shows (the first lines stand in until then); if that file
+ * can't come, the first lines stay with a link to the source.
+ */
+function feastPraise(f) {
+  const q = S.feastPraise;
+  if (q && q !== 'none') {
+    const kind = [PRAISE_TYPE[q.type] || 'تمجيد', q.context].filter(Boolean).join(' · ');
+    const host = new URL(q.source).hostname.replace(/^www\./, '');
+    return `<blockquote class="br-feast__praise br-feast__praise--full"><p class="br-feast__praise-title">${esc(q.title)}<small>${esc(kind)}</small></p>${q.verses.map(v => `<p class="br-feast__st">${v.map(esc).join('<br>')}${q.refrain ? `<br><span class="br-feast__ref">${esc(q.refrain)}</span>` : ''}</p>`).join('')}<p class="br-med__by">المصدر: <a href="${esc(q.source)}" target="_blank" rel="noopener">${esc(host)}</a></p></blockquote>`;
+  }
+  const lines = f.praiseText ? f.praiseText.split('\n').map(l => l.trim()).filter(Boolean) : [];
+  if (!lines.length) return '';
+  const link = !f.praiseId || q === 'none' ? `<p class="br-med__by"><a href="${esc(f.praise)}" target="_blank" rel="noopener">التمجيد كامل</a></p>` : '';
+  return `<blockquote class="br-feast__praise"><p class="br-feast__praise-title">${esc(f.praiseTitle || 'من التمجيد')}</p><p class="br-feast__praise-text">${lines.map(esc).join('<br>')}</p>${link}</blockquote>`;
+}
+async function fillFeastPraise() {
   const f = S.feast;
-  if (!f || !f.praiseId) return;
-  const q = praiseOf(await loadPraises(), f.person, f.praiseId);
-  if (!q) { window.open(f.praise, '_blank', 'noopener'); return; }
-  const d = dialog('pr', q.title, praiseSheet({ name: f.name, img: f.img, kicker: [PRAISE_TYPE[q.type] || 'تمجيد', q.context].filter(Boolean).join(' · '), praise: q }));
-  d.setAttribute('aria-labelledby', 'pr-title');
-  d.addEventListener('click', e => {
-    const z = e.target.closest('.pr__btn[data-size]');
-    if (z) { setSize(+z.dataset.size); return; }
-    if (e.target === d || e.target.closest('[data-pr-close]')) d.close();
-  });
+  if (!f || !f.praiseId || S.feastPraise) return;
+  S.feastPraise = praiseOf(await loadPraises(), f.person, f.praiseId) || 'none';
+  const old = app.querySelector('.br-feast .br-feast__praise');
+  if (old) old.outerHTML = feastPraise(f);
 }
 function openOccasion(id, at) {
   const o = S.occ && S.occ.occasions.find(x => x.id === id);
@@ -685,7 +692,6 @@ app.addEventListener('click', e => {
   if (v) { const card = v.closest('.oc'); openViewer(card ? card.dataset.occasion : '', +v.dataset.view); return; }
   const pr = e.target.closest('[data-praise]');
   if (pr) { openPraise(pr.dataset.praise); return; }
-  if (e.target.closest('[data-feast-praise]')) { openFeastPraise(); return; }
   const op = e.target.closest('[data-open]');
   if (op) { openOccasion(op.dataset.open, op.dataset.at); return; }
   if (e.target.matches('.br-add__time')) { try { e.target.showPicker(); } catch { /* the field itself still works */ } return; }
@@ -807,6 +813,7 @@ async function boot() {
   if (S.screen === 'church' && !S.occ) S.screen = 'today';
   S.view = S.topic ? 'today' : 'rest';
   render();
+  fillFeastPraise();
   if (location.hash === '#reflect') requestAnimationFrame(() => document.getElementById('reflect')?.scrollIntoView({ block: 'start' }));
   if (S.view === 'today') beacon(S.seed, 'open', S.day);
   loadReminders();
