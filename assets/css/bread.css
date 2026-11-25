@@ -1328,3 +1328,37 @@ html[data-look="dawn"] .oc.oc--bishop, html[data-look="dawn"] .oc.oc--memorial {
 .ch-nx__left b { font-family: var(--font-display); font-weight: 400; font-size: 1.55rem; color: var(--gold-hi); }
 .ch-nx__left small { font-size: .7rem; color: var(--text-3); }
 .ch-nx__left.is-near { background: rgba(110, 31, 36, .55); border-color: rgba(var(--gold-hi-rgb), .4); }
+
+/* ---------- P5 identity (owner 2026-11-25): «مناسبات كنيستنا» beside «خبزنا اليومي», the entrance, each card's reveal ---------- */
+.ch-pair { display: inline-flex; align-items: center; gap: 8px; flex: none; }
+.ch-pair img { display: block; border-radius: 50%; box-shadow: 0 8px 18px -8px rgba(0, 0, 0, .8); }
+.ch-pair i { width: 1px; height: 30px; background: linear-gradient(transparent, var(--gold), transparent); }
+.ch-in { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; background: #070208; pointer-events: none; }
+.ch-in__bloom { position: absolute; inset: -20%; background: radial-gradient(closest-side, rgba(155, 43, 53, .75), rgba(60, 12, 22, .4) 55%, transparent); }
+.ch-in__logo { position: relative; width: min(78vw, 440px); }
+.ch-in__logo svg { width: 100%; height: auto; display: block; overflow: visible; }
+.ch-in__logo svg [id$="ring"], .ch-in__logo svg [id$="halo-glow"], .ch-in__logo svg [id$="family-seal"], .ch-in__logo svg [id$="title"] { transform-box: fill-box; transform-origin: center; }
+.ch-in__flash { position: absolute; width: min(36vw, 230px); aspect-ratio: 1; border-radius: 50%; background: radial-gradient(closest-side, #fffbe8, rgba(255, 231, 166, .6) 35%, transparent); mix-blend-mode: screen; }
+/* the hymn: the card waits under a veil while the words are written with the voice */
+.oc { position: relative; }
+.oc.oc--event > :not(.oc-ev) { visibility: hidden; }   /* not opacity: the card's own entry animation would win over it */
+.oc.oc--shown > :not(.oc-ev) { transition: opacity .9s ease; }
+.oc-ev { position: absolute; inset: 0; z-index: 3; isolation: isolate; overflow: hidden; display: grid; align-content: center; justify-items: center; gap: 6px; padding: 18px; text-align: center; border-radius: inherit; background: radial-gradient(120% 90% at 50% 40%, rgba(70, 12, 22, .94), rgba(12, 2, 6, .98)); cursor: pointer; transition: opacity 1s ease; }
+.oc--family .oc-ev { background: radial-gradient(120% 90% at 50% 40%, rgba(14, 40, 80, .94), rgba(3, 8, 20, .98)); }
+.oc-ev.is-out { opacity: 0; pointer-events: none; }
+.oc-ev__l { margin: 0; font-family: var(--font-display); font-size: clamp(1.25rem, 3.4vw, 1.6rem); line-height: 1.7; color: #f6e2b4; }
+.oc-ev__l span { display: inline-block; opacity: 0; filter: blur(6px); transform: translateY(8px); transition: opacity .7s ease, filter .9s ease, transform .9s cubic-bezier(.22, 1, .36, 1); }
+.oc-ev__l span.on { opacity: 1; filter: none; transform: none; }
+.oc-ev__l--name { margin-top: 6px; font-size: clamp(1.6rem, 4.4vw, 2.1rem); color: #ffd98a; text-shadow: 0 0 18px rgba(242, 196, 122, .55); }
+.oc-ev__face { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; opacity: 0; z-index: -1; transform: scale(1.06); filter: saturate(.85); transition: opacity 1.6s ease, transform 3s ease; -webkit-mask-image: radial-gradient(75% 70% at 50% 45%, #000 40%, transparent 100%); mask-image: radial-gradient(75% 70% at 50% 45%, #000 40%, transparent 100%); }
+.oc-ev__face.on { opacity: .22; transform: none; }
+/* a repose: a candle's light, slow · the Pope, a bishop: light from above · others: a soft rise */
+.oc--candle { animation: oc-slow 1.6s ease both; }
+.oc--candle::after { content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit; background: radial-gradient(40% 50% at 82% 20%, rgba(255, 214, 140, .3), transparent 70%); animation: oc-candle 3.2s ease-in-out both; }
+.oc--light::after { content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit; background: conic-gradient(from 180deg at 50% -10%, transparent 40%, rgba(255, 255, 255, .55) 47%, transparent 50%, rgba(255, 255, 255, .4) 53%, transparent 60%); animation: oc-light 1.8s ease-out both; }
+.oc--soft { animation: oc-rise .8s cubic-bezier(.22, 1, .36, 1) both; }
+@keyframes oc-slow { from { opacity: 0; filter: brightness(.3); } to { opacity: 1; filter: none; } }
+@keyframes oc-candle { 0% { opacity: 0; } 20% { opacity: .9; } 35% { opacity: .65; } 55% { opacity: 1; } 75% { opacity: .8; } 100% { opacity: 0; } }
+@keyframes oc-light { 0% { opacity: 0; transform: translateY(-30%); } 40% { opacity: 1; } 100% { opacity: 0; transform: none; } }
+@keyframes oc-rise { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .oc--candle, .oc--soft, .oc--candle::after, .oc--light::after { animation: oc-fade .4s both; } @keyframes oc-fade { from { opacity: 0; } to { opacity: 1; } } }

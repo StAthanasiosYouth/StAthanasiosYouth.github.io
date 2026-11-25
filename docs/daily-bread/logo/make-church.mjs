@@ -139,4 +139,9 @@ ${seal}
 </svg>
 `;
 fs.writeFileSync(path.join(HERE, 'church-a.svg'), svg);
+// the site's copy: the fonts and the family seal from the site root (it is inlined into the page for the entrance)
+// The page's CSP has no inline styles: the <style> goes, the fonts become attributes (the page loads both fonts itself)
+const site = svg.split('href="../../../assets/').join('href="/assets/').replace(/<style>[\s\S]*?<\/style>/, '')
+  .split('class="ruqaa"').join('font-family="Aref Ruqaa, serif" font-weight="700"').split('class="cairo"').join('font-family="Cairo, sans-serif"');
+fs.writeFileSync(path.join(HERE, '..', '..', '..', 'assets', 'img', 'bread', 'church-logo.svg'), site);
 console.log('church-a.svg', svg.length, 'bytes');

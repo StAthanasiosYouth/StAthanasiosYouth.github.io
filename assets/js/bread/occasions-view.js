@@ -136,7 +136,7 @@ export function churchScreen(file, iso, { todayCard }) {
       <span class="ch-next__main"><small class="ch-next__k">${si('calendar')}مناسباتنا الجاية</small><b>${esc(first.o.headline.replace(/^النهارده /, ''))}</b><small>${esc(dayLine(first.at))} · ${left(between(iso, first.at))}</small></span>
       <span class="ch-next__go">${si('chevron')}</span></button>` : '';
   return `<main id="main" class="br-sheet-page ch">
-    <div class="br-h1"><span class="br-remind__ic">${si('church')}</span><div><h1>كنيستنا</h1><p>مناسبات كنيستنا وإيبارشيتنا وآبائنا، في يومها.</p></div></div>
+    <div class="br-h1 ch-h1"><span class="ch-pair" aria-hidden="true"><img src="${new URL('../../img/bread/mark-128.webp', import.meta.url).href}" alt="" width="40" height="40"><i></i><img src="${new URL('../../img/bread/church-logo.svg', import.meta.url).href}" alt="" width="52" height="52"></span><div><h1>مناسبات كنيستنا</h1><p>مناسبات كنيستنا وإيبارشيتنا وآبائنا، في يومها.</p></div></div>
     ${today}${next}
   </main>`;
 }

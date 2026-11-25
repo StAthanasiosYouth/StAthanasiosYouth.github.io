@@ -42,7 +42,7 @@ test.after(async () => {
 });
 
 /* the page on `day` (its clock moved), the program live that day (day 5) unless `program: false` */
-async function open(day, { width = 390, height = 844, program = true, path = '/daily-bread/?from=signin' } = {}) {
+async function open(day, { width = 390, height = 844, program = true, path = '/daily-bread/?from=signin', fx = false } = {}) {
   await w.startOn(prog.id, program ? dayAdd(day, -4) : dayAdd(day, 3));
   const ctx = await browser.createBrowserContext();
   const page = await ctx.newPage();
@@ -52,7 +52,8 @@ async function open(day, { width = 390, height = 844, program = true, path = '/d
   await page.setViewport({ width, height, isMobile: width < 700, hasTouch: width < 700 });
   await page.setRequestInterception(true);
   page.on('request', r => (r.url().startsWith(PROD) ? r.abort() : r.continue()));
-  await prime(page, w.API, { seed, extra: { ['bread.joined.' + prog.id]: dayAdd(day, -4) } });
+  // the section's effects (P5 identity) are off in these tests, on in their own
+  await prime(page, w.API, { seed, extra: { ['bread.joined.' + prog.id]: dayAdd(day, -4), ...(fx ? {} : { 'bread.fx': 'off' }) } });
   const at = Date.parse(day + 'T09:00:00Z');
   await page.evaluateOnNewDocument(at => { const shift = at - Date.now(); const now = Date.now.bind(Date); Date.now = () => now() + shift; }, at);
   await page.goto(w.LOCAL + path, { waitUntil: 'domcontentloaded' });
@@ -211,6 +212,34 @@ test('P5b seasons: a Kiahk day with no saint\'s card → «نحب نفكّرك»
   ({ page, ctx, errors } = await open('2027-09-01'));
   await sleep(1500);
   assert.equal(await page.$('.br-feast--season'), null);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('P5 identity (owner 2026-11-25): Abu Sefein\'s day opens with the hymn\'s words written in time, his picture behind the name, then the card; once a day; the «كنيستنا» entrance once a day; the logo pair', async () => {
+  await w.setting('BREAD_OCCASIONS', '1');
+  let { page, ctx, errors } = await open('2026-12-04', { fx: true });
+  await page.waitForSelector('.oc--patron');
+  await page.waitForSelector('.oc--patron .oc-ev');
+  assert.match(await text(page, '.oc-ev'), /تعالوا نتهلل بالألحان.*فيلوباتير مارقوريوس/);
+  await page.waitForFunction(() => document.querySelectorAll('.oc-ev [data-t].on').length >= 2, { timeout: 5000 });   // the first words, in time
+  await sleep(1200);
+  if (process.env.SAINTS_SHOTS) await page.screenshot({ path: '../docs/daily-bread/saints/p5/shots/p5-identity-hymn-built-m.png' });
+  // a tap skips to the card
+  await page.click('.oc-ev');
+  await page.waitForFunction(() => !document.querySelector('.oc-ev') && document.querySelector('.oc--patron.oc--shown'), { timeout: 5000 });
+  await page.goto(w.LOCAL + '/daily-bread/?from=signin', { waitUntil: 'domcontentloaded' });   // a new visit, without the section's own intro
+  await page.waitForSelector('.oc--patron');
+  await sleep(600);
+  assert.equal(await page.$('.oc-ev'), null, 'once a day');
+  // the tab: its entrance (first visit of the day), and the two logos side by side
+  await page.click('.tabbar [data-tab="church"]');
+  await page.waitForSelector('.ch-in svg [id$="sword-a"]');
+  if (process.env.SAINTS_SHOTS) { await sleep(1500); await page.screenshot({ path: '../docs/daily-bread/saints/p5/shots/p5-identity-entrance-built-m.png' }); }
+  await page.waitForFunction(() => !document.querySelector('.ch-in'), { timeout: 6000 });
+  assert.equal(await page.$$eval('.ch-pair img', n => n.length), 2);
+  assert.match(await text(page, '.ch h1'), /مناسبات كنيستنا/);
+  if (process.env.SAINTS_SHOTS) await page.screenshot({ path: '../docs/daily-bread/saints/p5/shots/p5-identity-tab-built-m.png' });
   assert.deepEqual(errors, []);
   await ctx.close();
 });

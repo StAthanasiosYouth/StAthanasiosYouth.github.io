@@ -22,6 +22,7 @@ import { occasionsOnDay, feastHidden, nextDate, cleanOccasions, praiseOf, season
 import { seasonsOn, SEASON_NAME } from './coptic.js';
 import { occasionCard, churchScreen, nextSheet, praiseSheet, viewerHtml, paintFrames, PRAISE_TYPE } from './occasions-view.js';
 import { readFace, RETURN_KEY, FROM_KEY } from '../account/link.js';
+import { entrance as churchEntrance, reveal as churchReveal } from './church-fx.js';
 import { soundEnabled, setSoundEnabled } from '../sound.js';
 
 const ROOT = new URL('../../../', import.meta.url);
@@ -505,6 +506,8 @@ function render() {
   app.innerHTML = `<div class="backdrop" aria-hidden="true"><div class="backdrop__glow"></div><div class="backdrop__lattice"></div></div>${view()}${S.sheet === 'share' ? shareSheet() : ''}${S.sheet === 'signin' ? signinSheet() : ''}<p class="br-toast" id="toast" role="status"></p>`;
   paintRings();
   paintFrames(app);
+  // P5 identity (owner 2026-11-25): each occasion card appears by its nature, once a day
+  if (S.occ) churchReveal(app, S.day);
   requestAnimationFrame(placeLens);
   if (focus) { const ta = app.querySelector('.br-field textarea'); if (ta) { ta.focus(); try { ta.setSelectionRange(focus.sel, focus.sel); } catch { /* fine */ } } }
   if (S.sheet) app.querySelector('.br-sheet')?.focus();
@@ -536,6 +539,8 @@ function go(screen, { replace = false } = {}) {
   render();
   scrollTo(0, 0);
   if (screen === 'reminders') loadReminders();
+  // P5 identity: the «كنيستنا» entrance, the first visit of the day
+  if (screen === 'church' && S.occ) churchEntrance(S.day);
 }
 
 /* ---------------- actions ---------------- */
