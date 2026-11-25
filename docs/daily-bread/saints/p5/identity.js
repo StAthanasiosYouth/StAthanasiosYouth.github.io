@@ -110,27 +110,31 @@ function card(type, title, who, img, note) {
 /* ---------- an event (owner 2026-11-25): the opening of the hymn sung in church, its words written with the voice ----------
  * Abu Sefein: «تعالوا نتهلل بالألحان» … until «فيلوباتير مارقوريوس» (CTV, «مديح القديس فيلوباتير مرقوريوس أبو سيفين»).
  * Pope Athanasius: «أثناسيوس يا رسول» … until «بنيوت أفا أثناسيوس» (ME Sat, «مديح لتمجيد البابا أثناسيوس الرسولي»).
- * The clip ends softly right after the name (a ≈ 1.5 s fade). The word times are the recording's own (faster-whisper,
+ * The clip ends right at the end of the name (a short ≈ 0.6 s fade, nothing sung after it); the saint's picture shows
+ * faintly while the name is sung; the card comes as the voice fades. No channel line (owner). The word times are the recording's own (faster-whisper,
  * checked against the hymn's text). No sound allowed → the words still come, by the clock.
  */
 const OPEN = {
-  patron: { src: 'sound/mercurius-open', from: 3.65, credit: 'من مديح أبي سيفين · قناة CTV', end: 21.43, lines: [
+  patron: { src: 'sound/mercurius-open', from: 3.65, end: 21.6, face: '/media/2026/img-f6438158.webp', lines: [
     [['تعالوا', 4.05], ['نتهلل', 5.03], ['بالألحان', 6.53]], [['ونرتل', 8.11], ['للفادي', 9.93], ['الديان', 11.15]],
     [['في', 12.47], ['عيد', 12.87], ['الشهيد', 13.31], ['بطل', 14.87], ['الإيمان', 15.43]], [['فيلوباتير', 16.81], ['مارقوريوس', 19.15]]] },
-  family: { src: 'sound/athanasius-open', from: 8.05, credit: 'من مديح البابا أثناسيوس · قناة ME Sat', end: 22.02, lines: [
+  family: { src: 'sound/athanasius-open', from: 8.05, end: 21.45, face: '/media/2026/img-d6052d80.webp', lines: [
     [['أثناسيوس', 8.46], ['يا', 10.88], ['رسول', 11.18]], [['حبنا', 12.48], ['لك', 13.78], ['على', 14.62], ['طول', 14.96]],
     [['كلنا', 15.58], ['بأجمعنا', 16.42], ['نقول', 18.0]], [['بنيوت', 18.88], ['أفا', 19.78], ['أثناسيوس', 20.42]]] }
 };
-const pickSrc = base => (document.createElement('audio').canPlayType('audio/ogg; codecs=opus') ? base + '.opus' : base + '.m4a');
+const pickSrc = base => (document.createElement('audio').canPlayType('audio/ogg; codecs=opus') ? base + '.opus?v=2' : base + '.m4a?v=2');
 function event(type, { at = null } = {}) {
   const o = OPEN[type], c = app.querySelector('.id-card--' + type);
   c.classList.remove('is-in', 'is-done'); c.classList.add('is-event');
   c.querySelector('.id-ev')?.remove();
-  c.insertAdjacentHTML('afterbegin', `<div class="id-ev" aria-hidden="true">${o.lines.map((l, i) => `<p class="id-ev__l${i === o.lines.length - 1 ? ' id-ev__l--name' : ''}">${l.map(([w, t]) => `<span data-t="${(t - o.from).toFixed(2)}">${w}</span>`).join(' ')}</p>`).join('')}<small class="id-ev__credit">${o.credit}</small></div>`);
+  c.insertAdjacentHTML('afterbegin', `<div class="id-ev" aria-hidden="true">${o.lines.map((l, i) => `<p class="id-ev__l${i === o.lines.length - 1 ? ' id-ev__l--name' : ''}">${l.map(([w, t]) => `<span data-t="${(t - o.from).toFixed(2)}">${w}</span>`).join(' ')}</p>`).join('')}</div>`);
+  // owner: when the name is sung, the saint's picture comes in, faintly, behind the words
+  c.querySelector('.id-ev').insertAdjacentHTML('afterbegin', `<img class="id-ev__face" src="${ROOT.slice(0, -1)}${o.face}" alt="">`);
   const ev = c.querySelector('.id-ev'), words = [...ev.querySelectorAll('[data-t]')], last = o.end - o.from;
   const finish = () => { ev.classList.add('is-out'); c.classList.remove('is-event'); c.classList.add('is-in', 'is-done'); setTimeout(() => ev.remove(), 1200); };
-  const paint = now => { words.forEach(w => w.classList.toggle('on', now >= +w.dataset.t)); return now >= last + 0.35; };
-  if (at != null) { paint(at); if (at >= last + 0.35) finish(); return; }
+  const nameAt = +ev.querySelector('.id-ev__l--name [data-t]').dataset.t, face = ev.querySelector('.id-ev__face');
+  const paint = now => { words.forEach(w => w.classList.toggle('on', now >= +w.dataset.t)); face.classList.toggle('on', now >= nameAt); return now >= last; };
+  if (at != null) { paint(at); if (at >= last) finish(); return; }
   const audio = new Audio(pickSrc(o.src)); audio.volume = 0.8;
   const t0 = performance.now(); let playing = false;
   audio.play().then(() => { playing = true; }, () => {});

@@ -81,4 +81,6 @@
 .id-ev__l span { display: inline-block; opacity: 0; filter: blur(6px); transform: translateY(8px); transition: opacity .7s ease, filter .9s ease, transform .9s cubic-bezier(.22, 1, .36, 1); }
 .id-ev__l span.on { opacity: 1; filter: none; transform: none; }
 .id-ev__l--name { margin-top: 6px; font-size: clamp(1.5rem, 3.2vw, 1.9rem); color: #ffd98a; text-shadow: 0 0 18px rgba(242, 196, 122, .55); }
-.id-ev__credit { position: absolute; bottom: 10px; inset-inline: 0; font-size: .68rem; color: rgba(246, 226, 180, .45); }
+.id-ev__face { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; opacity: 0; z-index: -1; transform: scale(1.06); filter: saturate(.85); transition: opacity 1.6s ease, transform 3s ease; -webkit-mask-image: radial-gradient(75% 70% at 50% 45%, #000 40%, transparent 100%); mask-image: radial-gradient(75% 70% at 50% 45%, #000 40%, transparent 100%); }
+.id-ev__face.on { opacity: .22; transform: none; }
+.id-ev { isolation: isolate; }
