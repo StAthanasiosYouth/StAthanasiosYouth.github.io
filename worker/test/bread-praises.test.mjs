@@ -162,3 +162,25 @@ test('seasons (owner 2026-11-25): Coptic Easter, the seasons of a day, a praise 
   const mary = JSON.parse(await h.db.prepare("SELECT data FROM saints_items WHERE kind = 'person' AND id = 'mary'").first('data'));
   assert.deepEqual(mary.praises.filter(q => q.seasons).map(q => [q.title, q.seasons]), [['الصوم هو أول وصية', ['virgin-fast']], ['يا م ر ي م', ['kiahk']]]);
 });
+
+test('0040 (owner 2026-11-25: confirm at once): 61 confirmed, the 11 left wait with a reason; what the owner confirmed himself untouched; one main at most', async () => {
+  const A = JSON.parse(readFileSync(new URL('../../daily-bread/saints/praises-approve.json', import.meta.url), 'utf8'));
+  assert.equal(A.decisions.length, 61);
+  assert.equal(Object.keys(A.keep).length, 11);
+  assert.ok(!A.decisions.some(d => ['mary', 'gabriel', 'michael'].includes(d.person)));
+  const { h } = await world();
+  const people = (await h.db.prepare("SELECT id, data FROM saints_items WHERE kind = 'person' AND json_extract(data, '$.praises') IS NOT NULL").all()).results.map(r => ({ id: r.id, ...JSON.parse(r.data) }));
+  const all = people.flatMap(p => p.praises.map(q => ({ p: p.id, ...q })));
+  for (const d of A.decisions) assert.equal(all.find(q => q.p === d.person && q.id === d.id).status, 'confirmed', d.person + '/' + d.id);
+  for (const k of Object.keys(A.keep)) { const [p, id] = k.split('/'); assert.equal(all.find(q => q.p === p && q.id === id).status, 'candidate', k); }
+  for (const p of people) {
+    assert.ok(p.praises.filter(q => q.status === 'confirmed' && q.main).length <= 1, p.id);
+    assert.ok(p.praises.every(q => q.status !== 'confirmed' || (q.verses && q.verses.length)), p.id);
+  }
+  assert.equal(praiseFor(people.find(p => p.id === 'athanasius'), 'نياحته').title, A.decisions.find(d => d.person === 'athanasius' && d.main).title);
+  // a praise the owner changed by hand (here: back to a candidate, with a note) is left as he left it
+  await h.db.prepare("UPDATE saints_items SET data = json_set(json_set(data, '$.praises[0].status', 'candidate'), '$.praises[0].note', 'شغلي'), updated_by = 'owner' WHERE kind = 'person' AND id = 'abraam'").run();
+  const sql = readFileSync(new URL('../migrations/0040_praises_approve.sql', import.meta.url), 'utf8');
+  for (const line of sql.split(/;\n(?=UPDATE|$)/).filter(l => /^UPDATE/.test(l))) await h.db.prepare(line).run();
+  assert.equal(JSON.parse(await h.db.prepare("SELECT data FROM saints_items WHERE id = 'abraam'").first('data')).praises[0].status, 'candidate');
+});
