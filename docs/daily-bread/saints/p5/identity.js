@@ -115,14 +115,14 @@ function card(type, title, who, img, note) {
  * checked against the hymn's text). No sound allowed → the words still come, by the clock.
  */
 const OPEN = {
-  patron: { src: 'sound/mercurius-open', from: 3.65, end: 21.6, face: '/media/2026/img-f6438158.webp', lines: [
+  patron: { src: 'sound/mercurius-open', from: 3.65, end: 21.85, face: '/media/2026/img-f6438158.webp', lines: [
     [['تعالوا', 4.05], ['نتهلل', 5.03], ['بالألحان', 6.53]], [['ونرتل', 8.11], ['للفادي', 9.93], ['الديان', 11.15]],
     [['في', 12.47], ['عيد', 12.87], ['الشهيد', 13.31], ['بطل', 14.87], ['الإيمان', 15.43]], [['فيلوباتير', 16.81], ['مارقوريوس', 19.15]]] },
-  family: { src: 'sound/athanasius-open', from: 8.05, end: 21.45, face: '/media/2026/img-d6052d80.webp', lines: [
+  family: { src: 'sound/athanasius-open', from: 8.05, end: 22.12, face: '/media/2026/img-d6052d80.webp', lines: [
     [['أثناسيوس', 8.46], ['يا', 10.88], ['رسول', 11.18]], [['حبنا', 12.48], ['لك', 13.78], ['على', 14.62], ['طول', 14.96]],
     [['كلنا', 15.58], ['بأجمعنا', 16.42], ['نقول', 18.0]], [['بنيوت', 18.88], ['أفا', 19.78], ['أثناسيوس', 20.42]]] }
 };
-const pickSrc = base => (document.createElement('audio').canPlayType('audio/ogg; codecs=opus') ? base + '.opus?v=2' : base + '.m4a?v=2');
+const pickSrc = base => (document.createElement('audio').canPlayType('audio/ogg; codecs=opus') ? base + '.opus?v=3' : base + '.m4a?v=3');
 function event(type, { at = null } = {}) {
   const o = OPEN[type], c = app.querySelector('.id-card--' + type);
   c.classList.remove('is-in', 'is-done'); c.classList.add('is-event');
